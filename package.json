@@ -1,0 +1,27 @@
+{
+  "name": "mercado-pos-colombia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Esqueleto de un punto de venta para Colombia",
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:pos": "npm run start --workspace @mercado-pos/pos",
+    "dev:api": "npm run dev --workspace @mercado-pos/api",
+    "typecheck": "npm run build:packages && npm run typecheck --workspace @mercado-pos/api && npm run typecheck --workspace @mercado-pos/pos",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "build:packages": "npm run build --workspace @mercado-pos/contracts && npm run build --workspace @mercado-pos/domain",
+    "build": "npm run build:packages && npm run build --workspace @mercado-pos/api && npm run build --workspace @mercado-pos/pos",
+    "verify": "npm run build && npm run test"
+  },
+  "allowScripts": {
+    "electron@37.10.3": true,
+    "esbuild@0.28.2": true
+  }
+}

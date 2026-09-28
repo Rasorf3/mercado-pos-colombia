@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowSyntheticDefaultImports": true,
+    "types": [
+      "node",
+      "webpack-env"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "webpack.*.ts",
+    "forge.config.ts"
+  ]
+}
