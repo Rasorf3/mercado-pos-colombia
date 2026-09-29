@@ -62,9 +62,10 @@ export function SalesHistoryScreen(): ReactElement {
       {error && <p className="receipt-error" role="alert">{error}</p>}
       {loading ? <p role="status">Cargando ventas…</p> : result?.sales.length ? <>
         <div className="table-scroll"><table className="history-table">
-          <thead><tr><th>Identificador interno</th><th>Fecha (UTC−5)</th><th>Total</th><th>Método de pago</th><th>Estado</th><th>Detalle</th></tr></thead>
+          <thead><tr><th>Identificador interno</th><th>Fecha (UTC−5)</th><th>Registró</th><th>Total</th><th>Método de pago</th><th>Estado</th><th>Detalle</th></tr></thead>
           <tbody>{result.sales.map((sale) => <tr key={sale.id}>
             <td className="sale-internal-id">{sale.id}</td><td>{saleDate(sale.createdAt)}</td>
+            <td>{sale.createdByUsername ?? "Usuario histórico no identificado"}</td>
             <td>{saleMoney(sale.totalCop)}</td><td>{paymentLabel(sale.payment.method)}</td>
             <td>Local · facturación electrónica pendiente</td>
             <td><button className="text-button" disabled={opening} onClick={() => void open(sale.id)}>Abrir</button></td>

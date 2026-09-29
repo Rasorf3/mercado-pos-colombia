@@ -129,6 +129,9 @@ export function normalizeSalePayment(
   const method = input.method as PaymentMethodId;
   const amountPaidCop = parseCopInteger(input.amountPaidCop);
   if (method === "cash") {
+    if (amountPaidCop === 0n) {
+      throw new DomainValidationError("Ingresa el efectivo recibido antes de registrar la venta.");
+    }
     if (amountPaidCop < totalCop) {
       throw new DomainValidationError("El efectivo recibido no alcanza a cubrir el total.");
     }

@@ -11,7 +11,7 @@ import type {
 import { roleCan, type Capability } from "@mercado-pos/domain";
 
 const PASSWORD_BYTES = 64;
-const PASSWORD_MIN_LENGTH = 12;
+const PASSWORD_MIN_LENGTH = 5;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_MS = 30_000;
 const DUMMY_SALT = randomBytes(16).toString("hex");
@@ -133,8 +133,8 @@ export class AuthService {
   async createUser(input: UserCreateInput): Promise<User> {
     const username = normalizeUsername(input.username);
     validatePassword(input.password);
-    if (input.role !== "admin" && input.role !== "employee") {
-      throw new Error("Solo se pueden crear usuarios Admin o Empleado.");
+    if (!(["admin", "employee_manager", "employee"] as const).includes(input.role)) {
+      throw new Error("Solo se pueden crear usuarios Admin, EmpleadoJefe o Empleado; AdminMaster no es asignable.");
     }
     const { salt, hash } = await hashPassword(input.password);
     const now = new Date().toISOString();
@@ -193,7 +193,7 @@ function normalizeUsername(input: string): string {
 
 function validatePassword(password: string): void {
   if (password.length < PASSWORD_MIN_LENGTH || password.length > 128) {
-    throw new Error("La contraseña debe tener entre 12 y 128 caracteres.");
+    throw new Error(`La contraseña debe tener entre ${PASSWORD_MIN_LENGTH} y 128 caracteres.`);
   }
 }
 

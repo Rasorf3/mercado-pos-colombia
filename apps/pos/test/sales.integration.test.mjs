@@ -140,6 +140,10 @@ test("rechaza método, valor y stock inválidos sin crear una venta parcial", ()
   }), /no alcanza/);
   assert.throws(() => sales.createSale({
     items: [{ productId: product.id, quantity: "1" }],
+    payment: { method: "cash", amountPaidCop: "0" }
+  }), /Ingresa el efectivo recibido/);
+  assert.throws(() => sales.createSale({
+    items: [{ productId: product.id, quantity: "1" }],
     payment: { method: "credit_card", amountPaidCop: "1001" }
   }), /igual al total/);
   assert.throws(() => sales.createSale({

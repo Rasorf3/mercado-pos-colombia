@@ -36,6 +36,7 @@ interface SaleRow {
   status: SaleStatus;
   total_cop: bigint;
   created_at: string;
+  created_by_username: string | null;
 }
 
 interface SaleItemRow {
@@ -226,15 +227,16 @@ export class SalesService {
     const { from, until } = salesDateBounds(input);
     const conditions: string[] = [];
     const parameters: string[] = [];
-    if (from) { conditions.push("created_at >= ?"); parameters.push(from); }
-    if (until) { conditions.push("created_at < ?"); parameters.push(until); }
+    if (from) { conditions.push("s.created_at >= ?"); parameters.push(from); }
+    if (until) { conditions.push("s.created_at < ?"); parameters.push(until); }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     return this.database.transaction(() => {
-      const count = this.database.prepare(`SELECT count(*) AS total FROM sales ${where}`)
+      const count = this.database.prepare(`SELECT count(*) AS total FROM sales s ${where}`)
         .get(...parameters) as { total: bigint };
       const rows = this.database.prepare(`
-        SELECT id, status, total_cop, created_at FROM sales ${where}
-        ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?
+        SELECT s.id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
+        FROM sales s LEFT JOIN pos_users u ON u.id = s.created_by_user_id ${where}
+        ORDER BY s.created_at DESC, s.rowid DESC LIMIT ? OFFSET ?
       `).all(...parameters, input.pageSize, (input.page - 1) * input.pageSize) as SaleRow[];
       return {
         page: input.page,
@@ -244,6 +246,7 @@ export class SalesService {
           id: row.id,
           status: row.status,
           totalCop: row.total_cop.toString(),
+          createdByUsername: row.created_by_username,
           payment: this.getPayment(row.id),
           buyer: this.getBuyer(row.id),
           createdAt: row.created_at
@@ -255,7 +258,8 @@ export class SalesService {
   getSale(id: string): Sale {
     validateSalesRequest<string>(SaleIdSchema, id);
     const row = this.database.prepare(`
-      SELECT id, status, total_cop, created_at FROM sales WHERE id = ?
+      SELECT s.id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
+      FROM sales s LEFT JOIN pos_users u ON u.id = s.created_by_user_id WHERE s.id = ?
     `).get(id) as SaleRow | undefined;
     if (!row) throw new SaleNotFoundError();
 
@@ -269,6 +273,7 @@ export class SalesService {
       id: row.id,
       status: row.status,
       totalCop: row.total_cop.toString(),
+      createdByUsername: row.created_by_username,
       items: items.map(toSaleLine),
       payment: this.getPayment(id),
       buyer: this.getBuyer(id),

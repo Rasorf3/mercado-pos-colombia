@@ -117,6 +117,7 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .stock-summary strong { display: block; overflow: hidden; color: #304b45; font-size: calc(12px * var(--font-scale, 1)); text-overflow: ellipsis; white-space: nowrap; }
 .stock-summary > div:first-child strong { color: #176d57; font: 700 calc(23px * var(--font-scale, 1)) Manrope, sans-serif; }
 .stock-summary > div:first-child strong small { font: 500 calc(10px * var(--font-scale, 1)) "DM Sans", sans-serif; }
+.product-audit-by { margin: 0 0 10px; color: #728078; font-size: calc(9px * var(--font-scale, 1)); }
 .movement-editor { padding-bottom: 16px; border-bottom: 1px solid #edf0ef; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .section-title h3 { margin: 0; color: #304644; font-size: calc(11px * var(--font-scale, 1)); letter-spacing: -.15px; }
@@ -291,6 +292,7 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .auth-card .field input { min-height: 43px; border: 1px solid #dce7e1; border-radius: 7px; padding: 0 11px; color: #213a32; background: #fff; }
 .auth-card .field input:focus { outline: 2px solid #9dceb8; border-color: #69a995; }
 .auth-hint { margin: -8px 0 0; color: #74837d; font-size: calc(12px * var(--font-scale, 1)); line-height: 1.5; }
+.caps-lock-warning { color: #95661e; font-size: calc(10px * var(--font-scale, 1)); font-weight: 650; }
 .auth-submit { width: 100%; }
 .logout-button { border: 0; padding: 0; color: #176b55; background: transparent; font-size: inherit; font-weight: 700; }
 .logout-button:hover { text-decoration: underline; }
@@ -302,6 +304,7 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .user-form-card .field { display: grid; gap: 6px; color: #546b61; font-size: calc(12px * var(--font-scale, 1)); font-weight: 650; }
 .user-form-card .field input, .user-form-card .field select { min-height: 38px; border: 1px solid #dce7e1; border-radius: 6px; padding: 0 9px; color: #253e32; background: #fff; }
 .user-form-card .field small { color: #8a9992; font-size: calc(10px * var(--font-scale, 1)); font-weight: 400; line-height: 1.45; }
+.user-form-card .field .caps-lock-warning { color: #95661e; font-weight: 650; }
 .users-empty { padding: 24px; color: #7d8b85; font-size: calc(13px * var(--font-scale, 1)); }
 .quick-client-trigger { justify-self: start; }
 .quick-client-form { display: grid; gap: 9px; border: 1px solid #dfe9e2; border-radius: 7px; padding: 10px; background: #f8fbf9; }

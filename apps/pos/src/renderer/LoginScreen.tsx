@@ -9,6 +9,7 @@ export function LoginScreen({ needsBootstrap, onAuthenticated, fontScale }: {
 }): ReactElement {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [capsLockActive, setCapsLockActive] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -38,8 +39,9 @@ export function LoginScreen({ needsBootstrap, onAuthenticated, fontScale }: {
       <h1>{needsBootstrap ? "Configura la caja" : "Iniciar sesión"}</h1>
       <p className="subheading">{needsBootstrap ? "Crea el primer usuario Admin. Esta configuración se realiza una sola vez en este equipo." : "Ingresa con tu usuario para acceder a las funciones asignadas."}</p>
       <label className="field">Usuario<input autoComplete="username" autoFocus minLength={3} maxLength={64} required value={username} onChange={(event) => setUsername(event.target.value)} /></label>
-      <label className="field">Contraseña<input type="password" autoComplete={needsBootstrap ? "new-password" : "current-password"} minLength={needsBootstrap ? 12 : 1} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-      {needsBootstrap && <p className="auth-hint">Usa al menos 12 caracteres. La contraseña se guarda como hash seguro, nunca en texto legible.</p>}
+      <label className="field">Contraseña<input type="password" autoComplete={needsBootstrap ? "new-password" : "current-password"} minLength={needsBootstrap ? 5 : 1} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => setCapsLockActive(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLockActive(event.getModifierState("CapsLock"))} onBlur={() => setCapsLockActive(false)} /></label>
+      {capsLockActive && <small className="caps-lock-warning" role="status">Bloq Mayús está activado.</small>}
+      {needsBootstrap && <p className="auth-hint">Usa al menos 5 caracteres. La contraseña se guarda como hash seguro, nunca en texto legible.</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button auth-submit" disabled={busy}>{busy ? "Verificando…" : needsBootstrap ? "Crear Admin y continuar" : "Ingresar"}</button>
     </form>

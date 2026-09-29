@@ -1,5 +1,7 @@
 export const PRODUCT_UNITS = ["unit", "kg", "g", "l", "ml", "m"] as const;
 export type ProductUnit = typeof PRODUCT_UNITS[number];
+export const PRODUCT_WEIGHT_UNITS = ["g", "kg", "lb"] as const;
+export type ProductWeightUnit = typeof PRODUCT_WEIGHT_UNITS[number];
 export type MovementType = "initial" | "entry" | "adjustment" | "sale_out";
 
 export interface ProductDraftInput {
@@ -9,6 +11,8 @@ export interface ProductDraftInput {
   costCop: string;
   salePriceCop: string;
   unit: string;
+  weightPerUnit?: string | null;
+  weightUnit?: string | null;
 }
 
 export interface NormalizedProductDraft {
@@ -18,6 +22,8 @@ export interface NormalizedProductDraft {
   costCop: bigint;
   salePriceCop: bigint;
   unit: ProductUnit;
+  weightPerUnitMilli: bigint | null;
+  weightUnit: ProductWeightUnit | null;
 }
 
 export const MAX_SQLITE_INTEGER = 9_223_372_036_854_775_807n;
@@ -108,14 +114,44 @@ export function normalizeProductDraft(input: ProductDraftInput): NormalizedProdu
     throw new DomainValidationError("La unidad de medida no es válida.");
   }
 
+  const rawWeight = input.weightPerUnit ?? null;
+  const rawWeightUnit = input.weightUnit ?? null;
+  if ((rawWeight === null) !== (rawWeightUnit === null)) {
+    throw new DomainValidationError("Completa tanto el peso por unidad como su unidad, o deja ambos vacíos.");
+  }
+  if (rawWeight !== null && input.unit !== "unit") {
+    throw new DomainValidationError("El peso por empaque solo aplica a productos cuyo inventario se cuenta por unidades.");
+  }
+  if (rawWeightUnit !== null && !PRODUCT_WEIGHT_UNITS.some((unit) => unit === rawWeightUnit)) {
+    throw new DomainValidationError("La unidad del peso por empaque debe ser g, kg o lb.");
+  }
+  const weightPerUnitMilli = rawWeight === null ? null : parseQuantityMilli(rawWeight);
+  if (weightPerUnitMilli === 0n) {
+    throw new DomainValidationError("El peso por unidad debe ser mayor que cero.");
+  }
+
   return {
     name,
     internalCode,
     barcode,
     costCop: parseCopInteger(input.costCop),
     salePriceCop: parseCopInteger(input.salePriceCop),
-    unit: input.unit as ProductUnit
+    unit: input.unit as ProductUnit,
+    weightPerUnitMilli,
+    weightUnit: rawWeightUnit as ProductWeightUnit | null
   };
+}
+
+export function calculateStockWeight(
+  stock: string,
+  weightPerUnit: string | null,
+  weightUnit: ProductWeightUnit | null
+): string | null {
+  if (weightPerUnit === null || weightUnit === null) return null;
+  const stockMilli = parseQuantityMilli(stock);
+  const weightMilli = parseQuantityMilli(weightPerUnit);
+  const totalMilli = (stockMilli * weightMilli + 500n) / 1_000n;
+  return `${formatQuantityMilli(totalMilli)} ${weightUnit}`;
 }
 
 export function applyStockDelta(currentStockMilli: bigint, deltaMilli: bigint): bigint {

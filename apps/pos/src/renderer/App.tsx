@@ -17,7 +17,7 @@ import type {
   ProductUpdateInput,
   UserRole
 } from "@mercado-pos/contracts";
-import { roleCan } from "@mercado-pos/domain";
+import { calculateStockWeight, roleCan } from "@mercado-pos/domain";
 import { ProductForm } from "./ProductForm";
 import { ProductInspector } from "./ProductInspector";
 import { SalesScreen } from "./SalesScreen";
@@ -297,9 +297,9 @@ export function App(): ReactElement {
                 <thead><tr><th>Producto</th><th>Código</th><th>Existencia</th><th>Precio</th><th>Estado</th></tr></thead>
                 <tbody>{products.map((product) => (
                   <tr key={product.id} className={selectedId === product.id ? "selected-row" : ""} onClick={() => { setEditing(undefined); void selectProduct(product); }} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setEditing(undefined); void selectProduct(product); } }}>
-                    <td><strong className="product-name">{product.name}</strong><small>{product.barcode ? `Barras · ${product.barcode}` : "Sin código de barras"}</small></td>
+                    <td><strong className="product-name">{product.name}</strong><small>{product.barcode ? `Barras · ${product.barcode}` : "Sin código de barras"}</small><small>Agregó: {product.createdByUsername ?? "Usuario histórico no identificado"}</small></td>
                     <td className="code-cell">{product.internalCode}</td>
-                    <td><strong>{product.stock}</strong><small>{unitLabel(product.unit)}</small></td>
+                    <td><strong>{product.stock}</strong><small>{unitLabel(product.unit)}</small>{product.weightPerUnit && product.weightUnit && <small>{calculateStockWeight(product.stock, product.weightPerUnit, product.weightUnit)} total</small>}</td>
                     <td className="money-cell">{formatCop(product.salePriceCop)}</td>
                     <td><span className={`state-pill ${product.active ? "active" : "inactive"}`}>{product.active ? "Activo" : "Inactivo"}</span></td>
                   </tr>

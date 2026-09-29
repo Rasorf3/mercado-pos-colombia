@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactElement } from "react";
 import type { InventoryAdjustmentInput, InventoryEntryInput, InventoryMovement, Product } from "@mercado-pos/contracts";
+import { calculateStockWeight } from "@mercado-pos/domain";
 
 interface Props {
   product: Product;
@@ -28,9 +29,11 @@ export function ProductInspector({ product, movements, busy, onEdit, onRecordEnt
       <div className="side-card-heading"><div><p className="eyebrow">Ficha de producto</p><h2 id="selected-product-title">{product.name}</h2></div><button className="icon-button edit-icon" onClick={onEdit} aria-label="Editar producto">✎</button></div>
       <div className="detail-codes"><span className={`state-pill ${product.active ? "active" : "inactive"}`}>{product.active ? "Activo" : "Inactivo"}</span><span>{product.internalCode}</span></div>
       {product.barcode && <p className="barcode-detail"><span aria-hidden="true">▥</span> {product.barcode}</p>}
+      <p className="product-audit-by"><strong>Agregó al catálogo:</strong> {product.createdByUsername ?? "Usuario histórico no identificado"}</p>
 
       <div className="stock-summary">
         <div><span>Existencia actual</span><strong>{product.stock}<small> {unitShort(product.unit)}</small></strong></div>
+        {product.weightPerUnit && product.weightUnit && <div><span>Peso total estimado</span><strong>{calculateStockWeight(product.stock, product.weightPerUnit, product.weightUnit)}</strong><small>{product.weightPerUnit} {product.weightUnit} por unidad</small></div>}
         <div><span>Precio de venta</span><strong>{formatCop(product.salePriceCop)}</strong></div>
         <div><span>Costo</span><strong>{formatCop(product.costCop)}</strong></div>
       </div>
@@ -54,7 +57,7 @@ export function ProductInspector({ product, movements, busy, onEdit, onRecordEnt
           <ol className="movement-list">{movements.slice(0, 8).map((movement) => (
             <li key={movement.id}>
               <span className={`movement-symbol ${movement.type}`}>{movement.type === "entry" ? "+" : movement.type === "sale_out" ? "−" : movement.type === "adjustment" ? "±" : "·"}</span>
-              <span className="movement-description"><strong>{movementLabel(movement.type)}</strong><small>{movement.note} · {formatDate(movement.createdAt)}</small></span>
+              <span className="movement-description"><strong>{movementLabel(movement.type)}</strong><small>{movement.note} · {formatDate(movement.createdAt)} · {movement.createdByUsername ?? "Usuario histórico no identificado"}</small></span>
               <span className="movement-quantity">{movement.quantity}<small>{unitShort(product.unit)}</small></span>
             </li>
           ))}</ol>

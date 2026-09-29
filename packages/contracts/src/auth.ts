@@ -9,6 +9,7 @@ export const UserRoleSchema = Type.Union([
 
 export const AssignableUserRoleSchema = Type.Union([
   Type.Literal("admin"),
+  Type.Literal("employee_manager"),
   Type.Literal("employee")
 ]);
 
@@ -19,12 +20,12 @@ export const LoginInputSchema = Type.Object({
 
 export const BootstrapAdminInputSchema = Type.Object({
   username: Type.String({ minLength: 3, maxLength: 64 }),
-  password: Type.String({ minLength: 12, maxLength: 128 })
+  password: Type.String({ minLength: 5, maxLength: 128 })
 }, { additionalProperties: false });
 
 export const UserCreateInputSchema = Type.Object({
   username: Type.String({ minLength: 3, maxLength: 64 }),
-  password: Type.String({ minLength: 12, maxLength: 128 }),
+  password: Type.String({ minLength: 5, maxLength: 128 }),
   role: AssignableUserRoleSchema
 }, { additionalProperties: false });
 

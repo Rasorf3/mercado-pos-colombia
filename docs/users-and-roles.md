@@ -5,7 +5,7 @@ Estado: primera implementación local. La API y la sincronización no usan esta 
 ## Inicio de sesión
 
 - La ventana de caja muestra una pantalla de acceso antes de montar las secciones de catálogo, ventas, clientes, historial o usuarios.
-- En una base sin cuentas, el asistente permite crear una sola vez la cuenta inicial **Admin**. Se exige una contraseña de 12 a 128 caracteres.
+- En una base sin cuentas, el asistente permite crear una sola vez la cuenta inicial **Admin**. Se exige una contraseña de 5 a 128 caracteres; el acceso y la creación de usuarios avisan si Bloq Mayús está activo. Se aceptan letras, números y símbolos; conviene elegir una contraseña más larga y única.
 - Las contraseñas se procesan en el proceso principal con `scrypt` (sal aleatoria individual); SQLite guarda la sal y el hash, nunca el texto de la contraseña. Los intentos fallidos se limitan temporalmente en memoria.
 - Cerrar sesión invalida la sesión del renderer. La sesión vive en memoria y se pierde al cerrar/reiniciar la aplicación, por lo que se vuelve a pedir contraseña.
 - No se implementaron recuperación/cambio de contraseña ni bloqueo automático por inactividad.
@@ -28,6 +28,8 @@ Estado: primera implementación local. La API y la sincronización no usan esta 
 
 La interfaz oculta secciones según el rol, pero esa ocultación no es la barrera de seguridad: cada handler IPC del proceso principal exige sesión y vuelve a comprobar el permiso. Se deniega por defecto; al agregar una capacidad futura se debe autorizar explícitamente a los roles ordinarios. AdminMaster queda reservado para las capacidades especiales que se definan después. La operación de venta guarda el UUID del usuario en la venta y en sus movimientos de salida; catálogo, movimientos y clientes guardan quién los creó o actualizó. Las ventas históricas previas a esta migración mantienen esos campos en `NULL`.
 
+Admin puede crear cuentas **Admin**, **EmpleadoJefe** y **Empleado**. El rol **AdminMaster** no aparece entre las opciones y es rechazado también por el contrato y el servicio principal.
+
 El empleado puede consultar productos mediante un resultado específico de venta que excluye el costo. Para escoger un comprador usa una búsqueda acotada a clientes activos y al perfil mínimo para asociarlo; no obtiene el directorio completo ni puede editar o desactivar clientes. Al crear una venta, el proceso principal vuelve a validar los datos y conserva la instantánea habitual del comprador.
 
 “Quitar” productos y clientes significa desactivarlos, no borrarlos: ventas y movimientos históricos deben seguir referenciándolos.
@@ -35,7 +37,7 @@ El empleado puede consultar productos mediante un resultado específico de venta
 ## Roles reservados y decisiones pendientes
 
 - `admin_master` existe como identificador reservado y obtiene todas las capacidades actuales y las que se agreguen al mapa de permisos. No hay credencial, contraseña fija, cuenta inicial, pantalla ni operación de IPC para asignarlo. El Admin del comercio no lo puede crear ni cambiar roles a ese valor. El mecanismo para acreditar al desarrollador debe diseñarse antes de habilitar ese acceso; editar SQLite manualmente no es una interfaz soportada.
-- `employee_manager` ya tiene su matriz de capacidades en dominio y SQLite, pero no aparece en el selector de creación: conforme al alcance acordado, Admin solo crea cuentas `admin` o `employee`. Falta decidir cómo aprovisionar un EmpleadoJefe sin convertir esa tarea en una elevación de privilegios para cualquier Admin.
+- La cuenta Admin puede asignar `employee_manager` junto con `admin` y `employee`. No hay edición posterior del rol de cuentas existentes.
 - No hay pantalla de proveedores ni de cierres de caja; esos permisos son reglas preparadas para módulos futuros, no funciones ya disponibles.
 - La autenticación es una barrera de la aplicación local, no cifrado de la base. Alguien con acceso al mismo perfil del sistema operativo y al archivo SQLite puede modificar o copiar datos fuera de la caja. Protegerse de ese escenario requerirá controles del sistema operativo/cifrado y un mecanismo de recuperación diseñado aparte.
 - No existe autenticación, usuarios ni aislamiento de comercios en `apps/api`; `/health` continúa siendo una ruta técnica independiente.

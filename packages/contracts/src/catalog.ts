@@ -14,6 +14,12 @@ export const ProductUnitSchema = Type.Union([
   Type.Literal("m")
 ]);
 
+export const ProductWeightUnitSchema = Type.Union([
+  Type.Literal("g"),
+  Type.Literal("kg"),
+  Type.Literal("lb")
+]);
+
 export const CopIntegerSchema = Type.String({
   pattern: "^\\d+$",
   maxLength: 19
@@ -40,11 +46,15 @@ const ProductFields = {
 
 export const ProductCreateSchema = Type.Object({
   ...ProductFields,
+  weightPerUnit: Type.Optional(Type.Union([QuantityInputSchema, Type.Null()])),
+  weightUnit: Type.Optional(Type.Union([ProductWeightUnitSchema, Type.Null()])),
   initialStock: QuantityInputSchema
 }, { additionalProperties: false });
 
 export const ProductUpdateSchema = Type.Object({
   ...ProductFields,
+  weightPerUnit: Type.Optional(Type.Union([QuantityInputSchema, Type.Null()])),
+  weightUnit: Type.Optional(Type.Union([ProductWeightUnitSchema, Type.Null()])),
   active: Type.Boolean()
 }, { additionalProperties: false });
 
@@ -53,6 +63,9 @@ export const ProductSchema = Type.Object({
   ...ProductFields,
   active: Type.Boolean(),
   stock: QuantityInputSchema,
+  weightPerUnit: Type.Union([QuantityInputSchema, Type.Null()]),
+  weightUnit: Type.Union([ProductWeightUnitSchema, Type.Null()]),
+  createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
   createdAt: Type.String({ format: "date-time" }),
   updatedAt: Type.String({ format: "date-time" })
 }, { additionalProperties: false });
@@ -103,6 +116,7 @@ export const InventoryMovementSchema = Type.Object({
   stockBefore: QuantityInputSchema,
   stockAfter: QuantityInputSchema,
   note: Type.String({ maxLength: 240 }),
+  createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
   createdAt: Type.String({ format: "date-time" })
 }, { additionalProperties: false });
 
@@ -167,6 +181,7 @@ export const SaleSchema = Type.Object({
   id: UuidSchema,
   status: SaleStatusSchema,
   totalCop: CopIntegerSchema,
+  createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
   items: Type.Array(SaleLineSchema, { minItems: 1, maxItems: 100 }),
   payment: SalePaymentSchema,
   buyer: Type.Union([BuyerSnapshotSchema, Type.Null()]),
@@ -177,12 +192,14 @@ export const SaleSummarySchema = Type.Object({
   id: UuidSchema,
   status: SaleStatusSchema,
   totalCop: CopIntegerSchema,
+  createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
   payment: SalePaymentSchema,
   buyer: Type.Union([BuyerSnapshotSchema, Type.Null()]),
   createdAt: Type.String({ format: "date-time" })
 }, { additionalProperties: false });
 
 export type ProductUnit = Static<typeof ProductUnitSchema>;
+export type ProductWeightUnit = Static<typeof ProductWeightUnitSchema>;
 export type ProductCreateInput = Static<typeof ProductCreateSchema>;
 export type ProductUpdateInput = Static<typeof ProductUpdateSchema>;
 export type Product = Static<typeof ProductSchema>;

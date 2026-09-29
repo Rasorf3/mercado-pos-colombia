@@ -16,6 +16,7 @@ export function SaleDetail({ sale, onClose }: { sale: Sale; onClose: () => void 
     <div className="sale-detail-card">
       <p className="sale-internal-id"><strong>Identificador interno:</strong> {sale.id}</p>
       <p><strong>Fecha:</strong> {saleDate(sale.createdAt)} (Colombia, UTC−5)</p>
+      <p><strong>Registró:</strong> {sale.createdByUsername ?? "Usuario histórico no identificado"}</p>
       <p>Datos e importes conservados al registrar la venta.</p>
       <div className="table-scroll"><table className="sale-detail-table">
         <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Importe guardado</th></tr></thead>

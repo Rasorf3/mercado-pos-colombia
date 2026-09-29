@@ -129,3 +129,20 @@ test("permite editar y desactivar sin borrar el historial ni el producto", () =>
   });
   assert.equal(reactivated.active, true);
 });
+
+test("persiste la equivalencia de peso opcional por empaque y admite libras", () => {
+  const packaged = catalog.createProduct({
+    name: "Café bolsa", internalCode: "CAF-LB", barcode: null,
+    costCop: "1000", salePriceCop: "1500", unit: "unit",
+    initialStock: "4", weightPerUnit: "2.5", weightUnit: "lb"
+  });
+  assert.equal(packaged.stock, "4");
+  assert.equal(packaged.weightPerUnit, "2.5");
+  assert.equal(packaged.weightUnit, "lb");
+  assert.equal(catalog.listProducts({ query: "CAF-LB", includeInactive: false })[0].weightUnit, "lb");
+  assert.throws(() => catalog.createProduct({
+    name: "Invalido", internalCode: "CAF-BAD", barcode: null,
+    costCop: "1000", salePriceCop: "1500", unit: "kg",
+    initialStock: "4", weightPerUnit: "2.5", weightUnit: "lb"
+  }), /solo aplica a productos.*unidades/);
+});

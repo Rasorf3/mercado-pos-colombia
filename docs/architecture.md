@@ -35,6 +35,7 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - `packages/contracts` contiene esquemas y tipos de frontera.
 - `packages/domain` aloja reglas puras de catálogo, inventario y ventas, sin acceso a interfaz o persistencia.
 - SQLite persiste catálogo, movimientos, clientes, ventas locales, líneas congeladas, instantánea de comprador opcional y un pago por venta en el directorio local de Electron, fuera del repositorio.
+- Para productos registrados por unidad se puede definir un peso opcional por empaque en g, kg o lb. El stock y los movimientos permanecen en unidades; la interfaz muestra el equivalente calculado con aritmética entera.
 - El renderer llama operaciones explícitas de catálogo y ventas por `preload`; solo el proceso principal accede a SQLite.
 - El costo y precio se guardan como enteros COP. Las cantidades se guardan en milésimas enteras (1 unidad = 1000 milésimas) y se convierten a texto decimal en las fronteras.
 - La creación, entradas y ajustes escriben el saldo y su movimiento en una sola transacción SQLite. La migración versionada crea las tablas e índices.
@@ -45,7 +46,8 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - Los métodos se persisten con IDs estables (`cash`, `debit_card`, `credit_card`, `bank_transfer`, `nequi`, `daviplata`, `bre_b`); la UI presenta etiquetas en español.
 - Un código de barras no puede repetirse. El código interno no es único en este alcance; solo se exige unicidad al código de barras.
 - El acceso al POS exige sesión local. Auth, contratos y permisos atraviesan React → preload → IPC → proceso principal; contraseñas se derivan con `scrypt` y permisos se vuelven a validar en cada operación protegida.
-- La migración v4 crea cuentas/roles y atribuye nuevas ventas, movimientos, altas y ediciones a un usuario. Datos antiguos conservan el actor como `NULL`; no se modifican sus importes, comprador ni existencias.
+- La migración v4 crea cuentas/roles y atribuye nuevas ventas, movimientos, altas y ediciones a un usuario; la v5 añade peso opcional por unidad sin alterar existencias históricas. Datos anteriores conservan su actor como `NULL` y peso no definido.
+- El historial de ventas y la ficha de producto muestran el nombre de quien registró la venta, creó el producto o realizó cada movimiento de stock. Admin puede asignar Admin, EmpleadoJefe o Empleado; AdminMaster sigue reservado.
 - AdminMaster no se asigna ni aprovisiona desde la interfaz. Su identidad está reservada, sin contraseña compartida ni puerta trasera distribuida.
 
 ## Historial y comprobantes locales

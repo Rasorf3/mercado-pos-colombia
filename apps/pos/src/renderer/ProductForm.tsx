@@ -22,12 +22,19 @@ export function ProductForm({ product, busy, onCancel, onCreate, onUpdate }: Pro
   const [costCop, setCostCop] = useState(product?.costCop ?? "");
   const [salePriceCop, setSalePriceCop] = useState(product?.salePriceCop ?? "");
   const [unit, setUnit] = useState<Product["unit"]>(product?.unit ?? "unit");
+  const [weightPerUnit, setWeightPerUnit] = useState(product?.weightPerUnit ?? "");
+  const [weightUnit, setWeightUnit] = useState<NonNullable<Product["weightUnit"]>>(product?.weightUnit ?? "kg");
   const [initialStock, setInitialStock] = useState("0");
   const [active, setActive] = useState(product?.active ?? true);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const fields = { name, internalCode, barcode: barcode.trim() || null, costCop, salePriceCop, unit };
+    const packageWeightEnabled = unit === "unit" && weightPerUnit.trim() !== "";
+    const fields = {
+      name, internalCode, barcode: barcode.trim() || null, costCop, salePriceCop, unit,
+      weightPerUnit: packageWeightEnabled ? weightPerUnit : null,
+      weightUnit: packageWeightEnabled ? weightUnit : null
+    };
     if (product) await onUpdate(product.id, { ...fields, active });
     else await onCreate({ ...fields, initialStock });
   };
@@ -42,10 +49,14 @@ export function ProductForm({ product, busy, onCancel, onCreate, onUpdate }: Pro
         <label className="field">Costo (COP)<input required inputMode="numeric" pattern="[0-9]+" value={costCop} onChange={(event) => setCostCop(event.target.value)} placeholder="0" /></label>
         <label className="field">Precio de venta (COP)<input required inputMode="numeric" pattern="[0-9]+" value={salePriceCop} onChange={(event) => setSalePriceCop(event.target.value)} placeholder="0" /></label>
         <label className="field">Unidad de medida<select value={unit} onChange={(event) => setUnit(event.target.value as Product["unit"])}>{units.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+        {unit === "unit" && <>
+          <label className="field">Peso por unidad/empaque <span className="optional-label">opcional</span><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,3})?" value={weightPerUnit} onChange={(event) => setWeightPerUnit(event.target.value)} placeholder="Ej. 2.5" /><small>Permite mostrar el peso estimado de la existencia.</small></label>
+          <label className="field">Unidad del peso<select value={weightUnit} onChange={(event) => setWeightUnit(event.target.value as NonNullable<Product["weightUnit"]>)}><option value="g">Gramos (g)</option><option value="kg">Kilogramos (kg)</option><option value="lb">Libras (lb)</option></select></label>
+        </>}
         {product ? (
           <label className="active-check"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /><span><strong>Producto activo</strong><small>Los productos inactivos no aparecen en la búsqueda normal.</small></span></label>
         ) : (
-          <label className="field full-field">Existencia inicial<input required inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,3})?" value={initialStock} onChange={(event) => setInitialStock(event.target.value)} placeholder="0" /><small>Hasta tres decimales. Quedará registrado como movimiento inicial.</small></label>
+          <label className="field full-field">Existencia inicial ({unit === "unit" ? "unidades" : unit})<input required inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,3})?" value={initialStock} onChange={(event) => setInitialStock(event.target.value)} placeholder="0" /><small>Hasta tres decimales. Quedará registrado como movimiento inicial.</small></label>
         )}
         <div className="form-actions"><button className="quiet-button" type="button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={busy}>{busy ? "Guardando…" : product ? "Guardar cambios" : "Crear producto"}</button></div>
       </form>

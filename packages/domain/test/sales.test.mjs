@@ -22,6 +22,7 @@ test("métodos de pago tienen identificadores estables y se validan", () => {
   }
 
   assert.equal(normalizeSalePayment({ method: "cash", amountPaidCop: "1500" }, 1000n).changeCop, 500n);
+  assert.throws(() => normalizeSalePayment({ method: "cash", amountPaidCop: "0" }, 0n), /Ingresa el efectivo recibido/);
   assert.throws(() => normalizeSalePayment({ method: "unknown", amountPaidCop: "1000" }, 1000n), /no es válido/);
   assert.throws(() => normalizeSalePayment({ method: "cash", amountPaidCop: "999" }, 1000n), /no alcanza/);
   assert.throws(() => normalizeSalePayment({ method: "nequi", amountPaidCop: "1001" }, 1000n), /igual al total/);

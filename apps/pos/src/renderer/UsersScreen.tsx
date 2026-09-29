@@ -6,6 +6,7 @@ export function UsersScreen(): ReactElement {
   const [users, setUsers] = useState<User[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [capsLockActive, setCapsLockActive] = useState(false);
   const [role, setRole] = useState<AssignableUserRole>("employee");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,7 +51,7 @@ export function UsersScreen(): ReactElement {
   };
 
   return <section className="users-page" aria-labelledby="users-title">
-    <div className="page-heading"><div><p className="eyebrow">Acceso local · permisos por rol</p><h1 id="users-title">Usuarios</h1><p className="subheading">Admin puede crear cuentas Admin y Empleado. AdminMaster no se asigna desde esta caja.</p></div></div>
+    <div className="page-heading"><div><p className="eyebrow">Acceso local · permisos por rol</p><h1 id="users-title">Usuarios</h1><p className="subheading">Admin puede crear cuentas Admin, EmpleadoJefe y Empleado. AdminMaster no se asigna desde esta caja.</p></div></div>
     <div className="users-layout">
       <section className="user-list-card"><div className="list-heading"><div><h2>Cuentas de este equipo</h2><span>{users.length} usuarios</span></div><span className="offline-badge"><i /> SQLite local</span></div>
         {users.length === 0 ? <p className="users-empty">Aún no hay cuentas adicionales.</p> : <div className="table-scroll"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Último ingreso</th><th></th></tr></thead><tbody>
@@ -59,8 +60,8 @@ export function UsersScreen(): ReactElement {
       </section>
       <aside className="user-form-card"><h2>Crear usuario</h2><form onSubmit={(event) => void createUser(event)}>
         <label className="field">Nombre de usuario<input required minLength={3} maxLength={64} autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} /><small>3–64 caracteres: letras sin tilde, números, punto, guion o guion bajo.</small></label>
-        <label className="field">Contraseña inicial<input required type="password" minLength={12} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /><small>Mínimo 12 caracteres. No la compartas por canales públicos.</small></label>
-        <label className="field">Rol<select value={role} onChange={(event) => setRole(event.target.value as AssignableUserRole)}><option value="employee">Empleado</option><option value="admin">Admin</option></select></label>
+        <label className="field">Contraseña inicial<input required type="password" minLength={5} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => setCapsLockActive(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLockActive(event.getModifierState("CapsLock"))} onBlur={() => setCapsLockActive(false)} /><small>Mínimo 5 caracteres. No la compartas por canales públicos.</small>{capsLockActive && <small className="caps-lock-warning" role="status">Bloq Mayús está activado.</small>}</label>
+        <label className="field">Rol<select value={role} onChange={(event) => setRole(event.target.value as AssignableUserRole)}><option value="employee">Empleado</option><option value="employee_manager">EmpleadoJefe</option><option value="admin">Admin</option></select></label>
         <button className="primary-button" disabled={busy}>{busy ? "Creando…" : "Crear usuario"}</button>
       </form></aside>
     </div>

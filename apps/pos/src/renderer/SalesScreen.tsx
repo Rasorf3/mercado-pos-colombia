@@ -60,7 +60,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
   const totalCop = calculation.value?.totalCop.toString() ?? "0";
 
   useEffect(() => {
-    setAmountPaidCop(totalCop);
+    setAmountPaidCop(method === "cash" ? "0" : totalCop);
   }, [totalCop, method]);
 
   const stockError = useMemo(() => {
@@ -309,7 +309,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
           </div>
 
           <div className="payment-fields">
-            <label className="field">Método de pago<select value={method} onChange={(event) => { setMethod(event.target.value as PaymentMethod); setReference(""); setAuthorizationCode(""); setAmountPaidCop(totalCop); }}>{PAYMENT_METHOD_OPTIONS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
+            <label className="field">Método de pago<select value={method} onChange={(event) => { const nextMethod = event.target.value as PaymentMethod; setMethod(nextMethod); setReference(""); setAuthorizationCode(""); setAmountPaidCop(nextMethod === "cash" ? "0" : totalCop); }}>{PAYMENT_METHOD_OPTIONS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
             <label className="field">{method === "cash" ? "Efectivo recibido (COP)" : "Valor pagado (COP)"}<input required inputMode="numeric" pattern="[0-9]+" maxLength={19} value={amountPaidCop} readOnly={method !== "cash"} onChange={(event) => setAmountPaidCop(event.target.value)} /></label>
             {paymentResult.value?.changeCop ? <div className="change-due"><span>Cambio</span><strong>{formatCop(paymentResult.value.changeCop)}</strong></div> : null}
             {showReference && <label className="field full-payment-field">Referencia de operación <span className="optional-label">opcional</span><input maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} placeholder="No ingreses claves ni datos bancarios" /></label>}
@@ -325,7 +325,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
         <div className="sale-panel-title"><div><p className="eyebrow">Historial en este equipo</p><h2>Ventas locales recientes</h2></div><span className="count-chip">{recentSales.length}</span></div>
         {recentSales.length === 0 ? <p className="sale-search-empty">Todavía no hay ventas locales.</p> : <div className="recent-sales-list">{recentSales.map((sale) => (
           <article className="recent-sale-row" key={sale.id}>
-            <div className="recent-sale-id"><strong>Venta {sale.id.slice(0, 8)}</strong><small>{formatDate(sale.createdAt)} · {sale.buyer?.name ?? "Sin cliente asociado"}</small></div>
+            <div className="recent-sale-id"><strong>Venta {sale.id.slice(0, 8)}</strong><small>{formatDate(sale.createdAt)} · Registró: {sale.createdByUsername ?? "Usuario histórico no identificado"} · {sale.buyer?.name ?? "Sin cliente asociado"}</small></div>
             <span className="payment-method-label">{methodLabel(sale.payment.method)}</span>
             <strong className="recent-sale-total">{formatCop(BigInt(sale.totalCop))}</strong>
             <span className="pending-pill">Local · pendiente de factura</span>
