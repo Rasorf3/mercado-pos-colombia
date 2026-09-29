@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 import {
   applyStockDelta,
+  discountFromStored,
+  formatBogotaDate,
   formatQuantityMilli,
   normalizeProductDraft,
   parseQuantityDeltaMilli,
@@ -14,6 +16,7 @@ import type {
   InventoryMovement,
   Product,
   ProductCreateInput,
+  ProductDiscount,
   ProductSearchInput,
   SaleProduct,
   ProductUpdateInput
@@ -29,6 +32,10 @@ interface ProductRow {
   unit: Product["unit"];
   weight_per_unit_milli: bigint | null;
   weight_unit: Product["weightUnit"];
+  promotion_discount_type: ProductDiscount["type"] | null;
+  promotion_discount_value: bigint | null;
+  promotion_starts_on: string | null;
+  promotion_ends_on: string | null;
   active: bigint;
   stock_milli: bigint;
   created_at: string;
@@ -75,6 +82,8 @@ export class CatalogService {
     const rows = this.database.prepare(`
       SELECT p.id, p.name, p.internal_code, p.barcode, p.cost_cop, p.sale_price_cop,
              p.unit, p.weight_per_unit_milli, p.weight_unit,
+             p.promotion_discount_type, p.promotion_discount_value,
+             p.promotion_starts_on, p.promotion_ends_on,
              p.active, p.stock_milli, p.created_at, p.updated_at,
              creator.username AS created_by_username
       FROM products p LEFT JOIN pos_users creator ON creator.id = p.created_by_user_id
@@ -100,9 +109,13 @@ export class CatalogService {
   }
 
   listProductsForSale(query: string): SaleProduct[] {
+    const today = formatBogotaDate();
     return this.listProducts({ query: query.trim(), includeInactive: false })
-      .map(({ id, name, internalCode, barcode, salePriceCop, unit, active, stock }) => ({
-        id, name, internalCode, barcode, salePriceCop, unit, active, stock
+      .map(({ id, name, internalCode, barcode, salePriceCop, unit, active, stock, promotion }) => ({
+        id, name, internalCode, barcode, salePriceCop, unit, active, stock,
+        activePromotion: promotion && today >= promotion.startsOn && today <= promotion.endsOn
+          ? promotion.discount
+          : null
       }));
   }
 
@@ -116,9 +129,11 @@ export class CatalogService {
       this.database.prepare(`
         INSERT INTO products (
           id, name, internal_code, barcode, cost_cop, sale_price_cop,
-          unit, weight_per_unit_milli, weight_unit, active, stock_milli, created_at, updated_at,
+          unit, weight_per_unit_milli, weight_unit,
+          promotion_discount_type, promotion_discount_value, promotion_starts_on, promotion_ends_on,
+          active, stock_milli, created_at, updated_at,
           created_by_user_id, updated_by_user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
       `).run(
         id,
         draft.name,
@@ -129,6 +144,10 @@ export class CatalogService {
         draft.unit,
         draft.weightPerUnitMilli,
         draft.weightUnit,
+        draft.promotion?.discount.type ?? null,
+        draft.promotion?.discount.value ?? null,
+        draft.promotion?.startsOn ?? null,
+        draft.promotion?.endsOn ?? null,
         initialStock,
         now,
         now,
@@ -154,12 +173,18 @@ export class CatalogService {
   }
 
   updateProduct(id: string, input: ProductUpdateInput, actorUserId: string | null = null): Product {
-    const draft = normalizeProductDraft(input);
     const updated = this.database.transaction(() => {
+      const existing = this.getProduct(id);
+      const draft = normalizeProductDraft({
+        ...input,
+        promotion: input.promotion === undefined ? existing.promotion : input.promotion
+      });
       const result = this.database.prepare(`
         UPDATE products
         SET name = ?, internal_code = ?, barcode = ?, cost_cop = ?,
             sale_price_cop = ?, unit = ?, weight_per_unit_milli = ?, weight_unit = ?,
+            promotion_discount_type = ?, promotion_discount_value = ?,
+            promotion_starts_on = ?, promotion_ends_on = ?,
             active = ?, updated_at = ?, updated_by_user_id = ?
         WHERE id = ?
       `).run(
@@ -171,6 +196,10 @@ export class CatalogService {
         draft.unit,
         draft.weightPerUnitMilli,
         draft.weightUnit,
+        draft.promotion?.discount.type ?? null,
+        draft.promotion?.discount.value ?? null,
+        draft.promotion?.startsOn ?? null,
+        draft.promotion?.endsOn ?? null,
         input.active ? 1n : 0n,
         new Date().toISOString(),
         actorUserId,
@@ -277,6 +306,8 @@ export class CatalogService {
     const row = this.database.prepare(`
       SELECT p.id, p.name, p.internal_code, p.barcode, p.cost_cop, p.sale_price_cop,
              p.unit, p.weight_per_unit_milli, p.weight_unit,
+             p.promotion_discount_type, p.promotion_discount_value,
+             p.promotion_starts_on, p.promotion_ends_on,
              p.active, p.stock_milli, p.created_at, p.updated_at,
              creator.username AS created_by_username
       FROM products p LEFT JOIN pos_users creator ON creator.id = p.created_by_user_id
@@ -308,6 +339,13 @@ function toProduct(row: ProductRow): Product {
     unit: row.unit,
     weightPerUnit: row.weight_per_unit_milli === null ? null : formatQuantityMilli(row.weight_per_unit_milli),
     weightUnit: row.weight_unit,
+    promotion: row.promotion_discount_type === null
+      ? null
+      : {
+        discount: discountFromStored(row.promotion_discount_type, row.promotion_discount_value)!,
+        startsOn: row.promotion_starts_on!,
+        endsOn: row.promotion_ends_on!
+      },
     active: row.active === 1n,
     stock: formatQuantityMilli(row.stock_milli),
     createdByUsername: row.created_by_username,

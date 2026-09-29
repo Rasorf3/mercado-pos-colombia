@@ -4,14 +4,20 @@ import { SaleIdSchema, type SalesListInput, type SalesPage } from "@mercado-pos/
 import { salesDateBounds, validateSalesRequest } from "./salesRequests.ts";
 import {
   applyStockDelta,
+  activePromotionDiscount,
   calculateSaleAmounts,
   combineSaleQuantities,
+  discountFromStored,
+  formatBogotaDate,
+  formatDiscountDraft,
   formatQuantityMilli,
+  normalizeDiscount,
   normalizeSalePayment,
   validateSaleStock
 } from "@mercado-pos/domain";
 import type {
   PaymentMethod,
+  ProductDiscount,
   BuyerSnapshot,
   ProductUnit,
   Sale,
@@ -27,6 +33,10 @@ interface ProductForSaleRow {
   name: string;
   unit: ProductUnit;
   sale_price_cop: bigint;
+  promotion_discount_type: ProductDiscount["type"] | null;
+  promotion_discount_value: bigint | null;
+  promotion_starts_on: string | null;
+  promotion_ends_on: string | null;
   active: bigint;
   stock_milli: bigint;
 }
@@ -45,6 +55,9 @@ interface SaleItemRow {
   unit: ProductUnit;
   quantity_milli: bigint;
   unit_price_cop: bigint;
+  discount_type: ProductDiscount["type"] | null;
+  discount_value: bigint | null;
+  discount_total_cop: bigint;
   line_total_cop: bigint;
 }
 
@@ -88,12 +101,29 @@ export class SalesService {
   }
 
   createSale(input: SaleCreateInput, actorUserId: string | null = null): Sale {
+    const requestedDiscounts = new Map<string, { provided: boolean; discount: ProductDiscount | null }>();
+    for (const line of input.items) {
+      const selection = {
+        provided: Object.prototype.hasOwnProperty.call(line, "discount"),
+        discount: line.discount ?? null
+      };
+      const previous = requestedDiscounts.get(line.productId);
+      if (previous && (previous.provided !== selection.provided
+        || JSON.stringify(previous.discount) !== JSON.stringify(selection.discount))) {
+          throw new Error("Un mismo producto no puede tener descuentos distintos en una sola venta.");
+      }
+      requestedDiscounts.set(line.productId, selection);
+    }
     const requestedLines = combineSaleQuantities(input.items);
     const create = this.database.transaction(() => {
+      const createdAt = new Date().toISOString();
+      const today = formatBogotaDate(new Date(createdAt));
       const buyer = input.clientId ? this.getActiveBuyer(input.clientId) : null;
       const lines = requestedLines.map((requested) => {
         const product = this.database.prepare(`
-          SELECT id, name, unit, sale_price_cop, active, stock_milli
+          SELECT id, name, unit, sale_price_cop, active, stock_milli,
+                 promotion_discount_type, promotion_discount_value,
+                 promotion_starts_on, promotion_ends_on
           FROM products WHERE id = ?
         `).get(requested.productId) as ProductForSaleRow | undefined;
 
@@ -106,20 +136,38 @@ export class SalesService {
           product.name
         );
 
+        const storedPromotion = product.promotion_discount_type === null
+          ? null
+          : {
+            discount: normalizeDiscount(
+              discountFromStored(product.promotion_discount_type, product.promotion_discount_value),
+              product.sale_price_cop
+            )!,
+            startsOn: product.promotion_starts_on!,
+            endsOn: product.promotion_ends_on!
+          };
+        const configuredDiscount = activePromotionDiscount(storedPromotion, today);
+        const selection = requestedDiscounts.get(product.id);
+        const discountDraft = selection?.provided
+          ? selection.discount
+          : formatDiscountDraft(configuredDiscount);
+        const discount = normalizeDiscount(discountDraft, product.sale_price_cop);
+
         return {
           product,
           quantityMilli: requested.quantityMilli,
+          discount,
           stockAfterMilli: applyStockDelta(product.stock_milli, -requested.quantityMilli)
         };
       });
 
-      const amounts = calculateSaleAmounts(lines.map(({ product, quantityMilli }) => ({
+      const amounts = calculateSaleAmounts(lines.map(({ product, quantityMilli, discount }) => ({
         quantity: formatQuantityMilli(quantityMilli),
-        unitPriceCop: product.sale_price_cop.toString()
+        unitPriceCop: product.sale_price_cop.toString(),
+        discount: formatDiscountDraft(discount)
       })));
       const payment = normalizeSalePayment(input.payment, amounts.totalCop);
       const saleId = randomUUID();
-      const createdAt = new Date().toISOString();
 
       this.database.prepare(`
         INSERT INTO sales (id, status, total_cop, created_at, created_by_user_id)
@@ -143,10 +191,10 @@ export class SalesService {
       const insertItem = this.database.prepare(`
         INSERT INTO sale_items (
           id, sale_id, product_id, product_name, unit, quantity_milli,
-          unit_price_cop, line_total_cop
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          unit_price_cop, discount_type, discount_value, discount_total_cop, line_total_cop
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      lines.forEach(({ product, quantityMilli }, index) => {
+      lines.forEach(({ product, quantityMilli, discount }, index) => {
         insertItem.run(
           randomUUID(),
           saleId,
@@ -155,6 +203,9 @@ export class SalesService {
           product.unit,
           quantityMilli,
           product.sale_price_cop,
+          discount?.type ?? null,
+          discount?.value ?? null,
+          amounts.lineDiscountsCop[index],
           amounts.lineTotalsCop[index]
         );
       });
@@ -265,7 +316,7 @@ export class SalesService {
 
     const items = this.database.prepare(`
       SELECT product_id, product_name, unit, quantity_milli,
-             unit_price_cop, line_total_cop
+             unit_price_cop, discount_type, discount_value, discount_total_cop, line_total_cop
       FROM sale_items WHERE sale_id = ? ORDER BY rowid
     `).all(id) as SaleItemRow[];
 
@@ -338,6 +389,8 @@ function toSaleLine(row: SaleItemRow): SaleLine {
     unit: row.unit,
     quantity: formatQuantityMilli(row.quantity_milli),
     unitPriceCop: row.unit_price_cop.toString(),
+    discount: discountFromStored(row.discount_type, row.discount_value) as SaleLine["discount"],
+    discountTotalCop: row.discount_total_cop.toString(),
     lineTotalCop: row.line_total_cop.toString()
   };
 }

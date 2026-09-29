@@ -52,6 +52,7 @@ ${buyer.email ? `<p>${text(buyer.email)}</p>` : ""}</td></tr>` : ""}
 ${sale.items.map((item) => `<tr><td class="item">
   <p class="name">${text(item.productName)}</p>
   <p>${text(item.quantity)} ${text(saleUnit(item.unit))} × ${money(item.unitPriceCop)}</p>
+  ${item.discount ? `<p>Descuento ${text(item.discount.type === "percentage" ? `${item.discount.value}%` : `${saleMoney(item.discount.valueCop)} por unidad`)}: −${money(item.discountTotalCop)}</p>` : ""}
   <p class="amount">Importe: <strong>${money(item.lineTotalCop)}</strong></p>
 </td></tr>`).join("")}
 <tr><td class="summary">

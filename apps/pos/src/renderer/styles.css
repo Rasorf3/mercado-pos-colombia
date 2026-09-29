@@ -158,6 +158,12 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .active-check strong, .active-check small { display: block; }
 .active-check strong { color: #53645f; font-size: calc(10px * var(--font-scale, 1)); }
 .active-check small { margin-top: 3px; color: #909c97; font-size: calc(9px * var(--font-scale, 1)); line-height: 1.4; }
+.promotion-editor { min-width: 0; grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; padding: 11px; border: 1px solid #e1ebe5; border-radius: 8px; background: #fbfdfb; }
+.promotion-editor legend { padding: 0 5px; color: #496258; font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; }
+.promotion-editor .active-check, .promotion-date-note { grid-column: 1 / -1; }
+.promotion-date-note { color: #8e9b95; font-size: calc(9px * var(--font-scale, 1)); }
+.promotion-summary { display: grid; gap: 4px; margin: 12px 0; padding: 11px; border: 1px solid #dbece3; border-radius: 8px; color: #436858; background: #f6fbf7; font-size: calc(10px * var(--font-scale, 1)); }
+.promotion-summary small { color: #81948a; line-height: 1.4; }
 .form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px solid #edf0ef; }
 .form-actions .primary-button, .form-actions .quiet-button { min-height: 35px; padding: 0 11px; font-size: calc(10px * var(--font-scale, 1)); }
 .app-footer { display: flex; justify-content: space-between; margin-top: 28px; padding: 13px 1px 0; border-top: 1px solid #e9eeeb; color: #9aa5a1; font-size: calc(9px * var(--font-scale, 1)); }
@@ -231,6 +237,11 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .quantity-field input { width: 84px; height: 27px; outline: none; border: 1px solid #e1e8e4; border-radius: 5px; padding: 0 7px; color: #3f554e; background: #fff; font-size: calc(10px * var(--font-scale, 1)); }
 .quantity-field input:focus { border-color: #70aa96; box-shadow: 0 0 0 2px #20836812; }
 .cart-line-total { color: #405b4e; font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; }
+.sale-discount-editor { display: grid; grid-template-columns: minmax(135px, 1fr) minmax(135px, 1fr); gap: 8px; margin-top: 8px; }
+.sale-discount-editor label { min-width: 0; display: grid; gap: 4px; color: #6f7f77; font-size: calc(9px * var(--font-scale, 1)); }
+.sale-discount-editor input, .sale-discount-editor select { min-width: 0; width: 100%; min-height: 30px; border: 1px solid #dce7e1; border-radius: 5px; padding: 0 7px; color: #324d40; background: #fff; font: inherit; }
+.sale-discount-editor small { color: #8a9991; font-size: calc(8px * var(--font-scale, 1)); line-height: 1.35; }
+.sale-discount-applied { margin: 6px 0 0; color: #557c66; font-size: calc(9px * var(--font-scale, 1)); }
 .sale-total-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding: 11px 0; border-bottom: 1px solid #eaf0ec; color: #64756e; font-size: calc(10px * var(--font-scale, 1)); }
 .sale-total-row strong { color: #176b55; font: 800 calc(18px * var(--font-scale, 1)) Manrope, "Segoe UI", sans-serif; letter-spacing: -.5px; }
 .payment-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }

@@ -5,6 +5,7 @@ import {
   parseCopInteger,
   parseQuantityMilli
 } from "./catalog.js";
+import { normalizeDiscount, type DiscountDraft, type NormalizedDiscount } from "./discounts.js";
 
 export const PAYMENT_METHOD_IDS = [
   "cash",
@@ -21,6 +22,7 @@ export type PaymentMethodId = typeof PAYMENT_METHOD_IDS[number];
 export interface SaleAmountLineInput {
   quantity: string;
   unitPriceCop: string;
+  discount?: DiscountDraft | null;
 }
 
 export interface SalePaymentDraft {
@@ -40,6 +42,8 @@ export interface NormalizedSalePayment {
 
 export function calculateSaleAmounts(lines: SaleAmountLineInput[]): {
   lineTotalsCop: bigint[];
+  lineDiscountsCop: bigint[];
+  normalizedDiscounts: Array<NormalizedDiscount | null>;
   totalCop: bigint;
 } {
   if (lines.length === 0 || lines.length > 100) {
@@ -47,27 +51,43 @@ export function calculateSaleAmounts(lines: SaleAmountLineInput[]): {
   }
 
   let totalCop = 0n;
-  const lineTotalsCop = lines.map(({ quantity: rawQuantity, unitPriceCop: rawPrice }) => {
+  const lineDiscountsCop: bigint[] = [];
+  const normalizedDiscounts: Array<NormalizedDiscount | null> = [];
+  const lineTotalsCop = lines.map(({ quantity: rawQuantity, unitPriceCop: rawPrice, discount }) => {
     const quantityMilli = parseQuantityMilli(rawQuantity);
     if (quantityMilli === 0n) {
       throw new DomainValidationError("La cantidad de cada producto debe ser mayor que cero.");
     }
 
     const unitPriceCop = parseCopInteger(rawPrice);
-    const numerator = unitPriceCop * quantityMilli;
-    // Price is COP per unit and quantity is in thousandths; round each line half-up to whole COP.
-    const lineTotalCop = (numerator + 500n) / 1_000n;
-    if (lineTotalCop > MAX_SQLITE_INTEGER) {
+    const normalizedDiscount = normalizeDiscount(discount, unitPriceCop);
+    const grossNumerator = unitPriceCop * quantityMilli;
+    const grossLineCop = (grossNumerator + 500n) / 1_000n;
+    let discountCop = 0n;
+    if (normalizedDiscount?.type === "percentage") {
+      const denominator = 10_000_000n;
+      const discountNumerator = grossNumerator * normalizedDiscount.value;
+      discountCop = (discountNumerator + denominator / 2n) / denominator;
+    } else if (normalizedDiscount?.type === "fixed") {
+      discountCop = (normalizedDiscount.value * quantityMilli + 500n) / 1_000n;
+    }
+    const netLineCop = grossLineCop - discountCop;
+    if (grossLineCop > MAX_SQLITE_INTEGER || discountCop > grossLineCop || discountCop > MAX_SQLITE_INTEGER) {
+      throw new DomainValidationError("El subtotal o descuento de una línea excede el máximo permitido por SQLite.");
+    }
+    if (netLineCop > MAX_SQLITE_INTEGER) {
       throw new DomainValidationError("El subtotal de una línea excede el máximo permitido por SQLite.");
     }
-    totalCop += lineTotalCop;
+    totalCop += netLineCop;
     if (totalCop > MAX_SQLITE_INTEGER) {
       throw new DomainValidationError("El total de la venta excede el máximo permitido por SQLite.");
     }
-    return lineTotalCop;
+    lineDiscountsCop.push(discountCop);
+    normalizedDiscounts.push(normalizedDiscount);
+    return netLineCop;
   });
 
-  return { lineTotalsCop, totalCop };
+  return { lineTotalsCop, lineDiscountsCop, normalizedDiscounts, totalCop };
 }
 
 export function addSaleQuantity(current: string, increment = "1"): string {

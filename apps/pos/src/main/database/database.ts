@@ -6,13 +6,15 @@ import { LOCAL_SALES_MIGRATION } from "./migrations/002_local_sales.ts";
 import { LOCAL_CLIENTS_MIGRATION } from "./migrations/003_local_clients.ts";
 import { USERS_AND_ROLES_MIGRATION } from "./migrations/004_users_and_roles.ts";
 import { PRODUCT_PACKAGE_WEIGHT_MIGRATION } from "./migrations/005_product_package_weight.ts";
+import { CATALOG_AND_SALE_DISCOUNTS_MIGRATION } from "./migrations/006_catalog_and_sale_discounts.ts";
 
 const MIGRATIONS = [
   INITIAL_CATALOG_MIGRATION,
   LOCAL_SALES_MIGRATION,
   LOCAL_CLIENTS_MIGRATION,
   USERS_AND_ROLES_MIGRATION,
-  PRODUCT_PACKAGE_WEIGHT_MIGRATION
+  PRODUCT_PACKAGE_WEIGHT_MIGRATION,
+  CATALOG_AND_SALE_DISCOUNTS_MIGRATION
 ];
 
 export function openPosDatabase(filePath: string): Database.Database {

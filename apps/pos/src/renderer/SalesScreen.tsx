@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
-import type { ClientCreateInput, PaymentMethod, SaleClientMatch, SaleProduct, Sale, SaleCreateInput, SaleSummary } from "@mercado-pos/contracts";
+import type { ClientCreateInput, PaymentMethod, ProductDiscount, SaleClientMatch, SaleProduct, Sale, SaleCreateInput, SaleSummary } from "@mercado-pos/contracts";
 import { PAYMENT_METHOD_OPTIONS } from "@mercado-pos/contracts";
 import { ReceiptActions } from "./ReceiptActions";
 import { SaleDetail } from "./SaleDetail";
@@ -20,6 +20,8 @@ interface Props {
 interface CartLine {
   product: SaleProduct;
   quantity: string;
+  discount: ProductDiscount | null;
+  discountSource: "promotion" | "manual" | "none";
 }
 
 type SaleStep = "products" | "payment";
@@ -52,9 +54,10 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
     if (cart.length === 0) return { value: null, error: "" };
     try {
       return {
-        value: calculateSaleAmounts(cart.map(({ product, quantity }) => ({
+        value: calculateSaleAmounts(cart.map(({ product, quantity, discount }) => ({
           quantity,
-          unitPriceCop: product.salePriceCop
+          unitPriceCop: product.salePriceCop,
+          discount
         }))),
         error: ""
       };
@@ -153,7 +156,10 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
       const quantity = existing ? addSaleQuantity(existing.quantity) : "1";
       setCart((current) => existing
         ? current.map((line) => line.product.id === product.id ? { ...line, product, quantity } : line)
-        : [...current, { product, quantity }]);
+        : [...current, {
+          product, quantity, discount: product.activePromotion,
+          discountSource: product.activePromotion ? "promotion" : "none"
+        }]);
     } catch (error) {
       setMessage(errorMessage(error));
     }
@@ -186,6 +192,31 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
     setCart((current) => current.map((line) => line.product.id === productId ? { ...line, quantity } : line));
   };
 
+  const updateDiscountType = (productId: string, type: string) => {
+    setCart((current) => current.map((line) => {
+      if (line.product.id !== productId) return line;
+      if (type === "none") return { ...line, discount: null, discountSource: "manual" };
+      return {
+        ...line,
+        discount: type === "percentage" ? { type, value: "" } : { type: "fixed", valueCop: "" },
+        discountSource: "manual"
+      };
+    }));
+  };
+
+  const updateDiscountValue = (productId: string, value: string) => {
+    setCart((current) => current.map((line) => {
+      if (line.product.id !== productId || !line.discount) return line;
+      return {
+        ...line,
+        discount: line.discount.type === "percentage"
+          ? { type: "percentage", value }
+          : { type: "fixed", valueCop: value },
+        discountSource: "manual"
+      };
+    }));
+  };
+
   const removeCartProduct = (productId: string) => {
     const removingLastProduct = cart.length === 1 && cart[0]?.product.id === productId;
     setCart((current) => current.filter((line) => line.product.id !== productId));
@@ -196,7 +227,11 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
     event.preventDefault();
     if (busy || !calculation.value || !paymentResult.value || stockError) return;
     const input: SaleCreateInput = {
-      items: cart.map(({ product, quantity }) => ({ productId: product.id, quantity })),
+      items: cart.map(({ product, quantity, discount, discountSource }) => ({
+        productId: product.id,
+        quantity,
+        ...(discountSource === "promotion" ? {} : { discount })
+      })),
       ...(selectedBuyer ? { clientId: selectedBuyer.id } : {}),
       payment: {
         method,
@@ -301,7 +336,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
 
         <div className="sale-workspace-cart">
           <div className="sale-cart-heading"><div><p className="eyebrow">Carrito</p><h3>Productos de esta venta</h3></div><button type="button" className="quiet-small" disabled={cart.length === 0} onClick={() => setCart([])}>Vaciar</button></div>
-          {cart.length === 0 ? <div className="cart-empty"><span aria-hidden="true">▱</span><strong>Agrega productos a la venta</strong><small>El carrito aparecerá aquí para que revises cantidades e importes.</small></div> : <SaleCartLines cart={cart} lineTotals={lineTotals} onQuantityChange={updateQuantity} onRemove={removeCartProduct} />}
+          {cart.length === 0 ? <div className="cart-empty"><span aria-hidden="true">▱</span><strong>Agrega productos a la venta</strong><small>El carrito aparecerá aquí para que revises cantidades e importes.</small></div> : <SaleCartLines cart={cart} lineTotals={lineTotals} lineDiscounts={calculation.value?.lineDiscountsCop ?? []} editableDiscount={false} onDiscountTypeChange={updateDiscountType} onDiscountValueChange={updateDiscountValue} onQuantityChange={updateQuantity} onRemove={removeCartProduct} />}
           <div className="sale-total-row"><span>Total de la venta</span><strong>{formatCop(due)}</strong></div>
           {calculation.error && <p className="form-error" role="alert">{calculation.error}</p>}
           {stockError && <p className="form-error" role="alert">{stockError}</p>}
@@ -312,7 +347,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
         <div className="sale-payment-content">
           <section className="sale-payment-summary" aria-labelledby="payment-summary-title">
             <div className="sale-cart-heading"><div><p className="eyebrow">Resumen</p><h3 id="payment-summary-title">Productos de esta venta</h3></div></div>
-            <SaleCartLines cart={cart} lineTotals={lineTotals} onQuantityChange={updateQuantity} onRemove={removeCartProduct} />
+            <SaleCartLines cart={cart} lineTotals={lineTotals} lineDiscounts={calculation.value?.lineDiscountsCop ?? []} editableDiscount onDiscountTypeChange={updateDiscountType} onDiscountValueChange={updateDiscountValue} onQuantityChange={updateQuantity} onRemove={removeCartProduct} />
             <div className="sale-total-row"><span>Total de la venta</span><strong>{formatCop(due)}</strong></div>
             {calculation.error && <p className="form-error" role="alert">{calculation.error}</p>}
             {stockError && <p className="form-error" role="alert">{stockError}</p>}
@@ -379,9 +414,13 @@ function CompletedSale({ sale, onDetail }: { sale: Sale; onDetail: () => void })
   );
 }
 
-function SaleCartLines({ cart, lineTotals, onQuantityChange, onRemove }: {
+function SaleCartLines({ cart, lineTotals, lineDiscounts, editableDiscount, onDiscountTypeChange, onDiscountValueChange, onQuantityChange, onRemove }: {
   cart: CartLine[];
   lineTotals: bigint[];
+  lineDiscounts: bigint[];
+  editableDiscount: boolean;
+  onDiscountTypeChange: (productId: string, type: string) => void;
+  onDiscountValueChange: (productId: string, value: string) => void;
   onQuantityChange: (productId: string, quantity: string) => void;
   onRemove: (productId: string) => void;
 }): ReactElement {
@@ -389,8 +428,17 @@ function SaleCartLines({ cart, lineTotals, onQuantityChange, onRemove }: {
     <article className="cart-line" key={line.product.id}>
       <div className="cart-line-top"><div><strong>{line.product.name}</strong><small>{formatCop(BigInt(line.product.salePriceCop))} / {shortUnit(line.product.unit)}</small></div><button type="button" className="remove-line" onClick={() => onRemove(line.product.id)} aria-label={`Quitar ${line.product.name}`}>×</button></div>
       <div className="cart-line-bottom"><label className="quantity-field">Cantidad<input required inputMode="decimal" maxLength={24} pattern="[0-9]+([.,][0-9]{1,3})?" value={line.quantity} onChange={(event) => onQuantityChange(line.product.id, event.target.value)} aria-label={`Cantidad de ${line.product.name}`} /></label><span className="cart-line-total">{lineTotals[index] === undefined ? "—" : formatCop(lineTotals[index])}</span></div>
+      {editableDiscount && <div className="sale-discount-editor"><label>Descuento<select value={line.discount?.type ?? "none"} onChange={(event) => onDiscountTypeChange(line.product.id, event.target.value)} aria-label={`Tipo de descuento para ${line.product.name}`}><option value="none">Sin descuento</option><option value="percentage">Porcentaje</option><option value="fixed">Valor fijo por unidad</option></select></label>
+        {line.discount && <label>{line.discount.type === "percentage" ? "Porcentaje (%)" : "COP por unidad"}<input required inputMode={line.discount.type === "percentage" ? "decimal" : "numeric"} pattern={line.discount.type === "percentage" ? "(?:100(?:[.,]0{1,2})?|(?:0|[1-9][0-9]?)(?:[.,][0-9]{1,2})?)" : "[0-9]+"} maxLength={line.discount.type === "percentage" ? 6 : 19} value={line.discount.type === "percentage" ? line.discount.value : line.discount.valueCop} onChange={(event) => onDiscountValueChange(line.product.id, event.target.value)} placeholder={line.discount.type === "percentage" ? "Ej. 10 o 10,5" : "Ej. 500"} aria-label={`Valor de descuento para ${line.product.name}`} />
+          <small>{line.discount.type === "percentage" ? "Hasta dos decimales; máximo 100%." : "Se descuenta por cada unidad (o fracción vendida)."}</small></label>}
+      </div>}
+      {line.discount && <p className="sale-discount-applied">Descuento {discountLabel(line.discount)}: −{lineDiscounts[index] === undefined ? "—" : formatCop(lineDiscounts[index])}</p>}
     </article>
   ))}</div>;
+}
+
+function discountLabel(discount: ProductDiscount): string {
+  return discount.type === "percentage" ? `${discount.value}%` : `${formatCop(BigInt(discount.valueCop))} por unidad`;
 }
 
 function formatCop(value: bigint): string {

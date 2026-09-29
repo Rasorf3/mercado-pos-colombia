@@ -9,6 +9,7 @@ Mercado POS Colombia es una caja de escritorio local-first. El monorepo usa Node
 Ya existen:
 
 - Catálogo local: crear, editar, buscar y desactivar productos; código de barras único.
+- Promociones locales por producto: porcentaje con hasta dos decimales o descuento fijo COP por unidad/empaque, con vigencia inclusiva en fecha Colombia; se aplican automáticamente en caja y son editables para una venta puntual. Las ventas congelan tipo, valor, descuento COP y subtotal neto.
 - Inventario local: existencias iniciales, entradas, ajustes y salidas de venta como movimientos trazables. No cambies el stock sin insertar el movimiento correspondiente.
 - Venta local mínima offline: un método de pago por venta, instantánea de las líneas, descuento de inventario y persistencia dentro de una transacción SQLite. El estado es `local_pending_invoice`; no es factura electrónica ni acredita envío, validación o aceptación por la DIAN.
 - La caja presenta la venta en dos pasos secuenciales a ancho completo: búsqueda/carrito y después resumen/pago. El campo de efectivo arranca en cero y limpia ese cero al recibir el foco para evitar prefijos accidentales.
@@ -16,7 +17,7 @@ Ya existen:
 - Historial local paginado y filtrado por días de Colombia (UTC−5), con detalle de las instantáneas guardadas. Reutiliza las tablas e índice existentes, sin migración nueva.
 - Comprobante local de 58/80 mm con impresión mediante diálogo y PDF mediante selección de ubicación, accesibles al cerrar la venta y desde su detalle. Los márgenes/largo por página son configurables; no hay recursos de internet ni efectos sobre ventas o inventario al reimprimir.
 - Acceso local con alta única del primer Admin, hash de contraseñas `scrypt`, cierre de sesión, administración de usuarios y permisos verificados en handlers IPC. Admin puede crear Admin, EmpleadoJefe y Empleado, pero no AdminMaster. Empleado accede al flujo de ventas y puede crear clientes; EmpleadoJefe también puede vender y conserva sus permisos de inventario, clientes e historial. Ambos usan resultados de producto sin costo en el flujo de venta. Las cuentas solo se guardan localmente.
-- Migraciones SQLite v4-v5: cuentas/roles y atribución del actor en operaciones nuevas de venta, inventario, productos y clientes; peso opcional por unidad/empaque (g/kg/lb). Históricos conservan atribución nula y productos sin equivalencia de peso.
+- Migraciones SQLite v4-v6: cuentas/roles y atribución del actor en operaciones nuevas de venta, inventario, productos y clientes; peso opcional por unidad/empaque (g/kg/lb); configuración de promociones del catálogo e instantáneas de descuentos en líneas de venta. Históricos conservan atribución nula, productos sin equivalencia de peso ni promoción y ventas sin descuento.
 - Pruebas de dominio, contratos, persistencia SQLite, migraciones y reversión completa de una venta ante error.
 
 La verificación del 2026-09-28 pasó `npm test` (27 pruebas), `npm run typecheck`, `npm run build`, `git diff --check` y el inicio de `npm run dev:pos` con una ventana visible. Se generaron y revisaron visualmente PDFs reales de 58/80 mm, incluidos 40 productos con nombres largos; también se probó navegación y PDF desde cierre/detalle con perfil aislado y red bloqueada. No se probó una impresora física ni la interacción manual con los diálogos del controlador: cancelaciones y selección de ruta se simularon. Solo se detectaron impresoras virtuales. La compilación y las pruebas pueden mostrar avisos no bloqueantes `MODULE_TYPELESS_PACKAGE_JSON` relacionados con la detección de módulos. Repite las verificaciones después de modificar el código; el árbol de trabajo puede haber cambiado desde esa ejecución.
@@ -24,6 +25,8 @@ La verificación del 2026-09-28 pasó `npm test` (27 pruebas), `npm run typechec
 El 2026-09-29, tras añadir autenticación local y roles, pasaron `npm test` (31 pruebas), `npm run typecheck`, `npm run build` y `git diff --check`. Un smoke test de Electron aisló `userData` en una carpeta temporal y comprobó configuración del primer Admin, alta de Empleado, logout/login, navegación limitada y rechazo de IPC para historial/directorios; también comprobó la búsqueda de producto de venta sin costo y alta de cliente. La prueba usó solo datos ficticios y no probó impresora física. El comando de desarrollo se abrió durante la verificación; se cerró antes de repetir la compilación para evitar que Forge compartiera `.webpack` entre ambos procesos.
 
 Verificación final del 2026-09-29 para atribución de usuarios, equivalencia de peso por empaque, asignación de roles y contraseñas de 5 caracteres: pasaron `npm test` (33 pruebas), `npm run typecheck`, `npm run build` y `git diff --check`. El ejecutable x64 empaquetado abrió la ventana “Mercado POS Colombia” con un perfil `userData` temporal aislado; la prueba no usó ni modificó la base real del usuario. No se probó una impresora física. Persisten únicamente los avisos no bloqueantes `MODULE_TYPELESS_PACKAGE_JSON` durante pruebas/compilación.
+
+Verificación del 2026-09-29 para descuentos por línea y promociones programadas: pasaron `npm test` (1 prueba API, 20 POS, 6 contratos y 12 dominio), `npm run typecheck`, `npm run build` y `git diff --check`. `npm run dev:pos` abrió una ventana con título “Mercado POS Colombia”. La migración SQLite v6 conserva bases previas; los descuentos se guardan en la instantánea de cada línea. No se añadieron dependencias ni se modificaron las reglas fiscales.
 
 ## Mapa del código
 
@@ -34,7 +37,7 @@ Verificación final del 2026-09-29 para atribución de usuarios, equivalencia de
 - `apps/pos/src/main/sales/`: lecturas de historial/detalle, cierre de ventas y validación de solicitudes IPC. `main/receipts/`: plantilla escapada, servicio de solo lectura y adaptador Electron de impresión/PDF.
 - `apps/pos/src/renderer/SalesHistoryScreen.tsx`, `SaleDetail.tsx`, `ReceiptActions.tsx`: historial, detalle y controles de salida. `packages/contracts/src/salesHistory.ts`: contratos de consulta y comprobante.
 - `apps/api/`: Fastify independiente, actualmente con `/health`.
-- `packages/domain/`: reglas puras de catálogo, cantidades, pagos y totales.
+- `packages/domain/`: reglas puras de catálogo, cantidades, promociones/descuentos, pagos y totales.
 - `packages/contracts/`: esquemas TypeBox compartidos.
 - `docs/architecture.md`, `docs/offline-sale-flow.md`, `docs/dian.md`: arquitectura, venta offline y límites DIAN.
 - `docs/maintenance-electron-44.md`: actualización de Electron y fotografía histórica de `npm audit`; vuelve a ejecutar el audit antes de tomar decisiones de seguridad.
@@ -44,6 +47,7 @@ Verificación final del 2026-09-29 para atribución de usuarios, equivalencia de
 
 - Dinero: enteros COP; no usar `number` de JavaScript para cálculos monetarios. Las cantidades se almacenan como milésimas enteras y se aceptan hasta tres decimales.
 - Total de venta: subtotales calculados exactamente y redondeados por línea al peso COP más cercano, mitad hacia arriba. No se aplica ni se presume IVA.
+- Descuentos: porcentaje hasta dos decimales representado en puntos básicos o COP enteros por unidad; un descuento fijo se multiplica por cantidad (también fraccionaria). Bruto de línea y descuento se redondean half-up por separado y el neto es bruto menos descuento, usando solo `bigint`.
 - La venta conserva una instantánea de nombre, unidad, precio y cantidad. El proceso principal vuelve a leer producto, precio y stock al cerrar la venta.
 - La venta conserva una instantánea del comprador opcional. Actualizar o desactivar el perfil nunca cambia el comprador guardado en una venta histórica.
 - Historial, detalle y comprobante usan exclusivamente importes/instantáneas guardados. El renderer envía UUID y formato, nunca HTML, rutas ni importes a imprimir; main valida, relee SQLite y escapa texto. Reintentar imprimir/exportar no cambia datos ni estado fiscal. La plantilla muestra “COMPROBANTE LOCAL — NO ES FACTURA ELECTRÓNICA” y facturación pendiente.

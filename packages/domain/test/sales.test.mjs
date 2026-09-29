@@ -42,6 +42,28 @@ test("totales COP son exactos y redondean cada línea half-up al peso", () => {
   assert.throws(() => calculateSaleAmounts([{ quantity: "0", unitPriceCop: "100" }]), /mayor que cero/);
 });
 
+test("calcula descuentos porcentuales y fijos por unidad con COP enteros", () => {
+  const amounts = calculateSaleAmounts([
+    { quantity: "1", unitPriceCop: "999", discount: { type: "percentage", value: "12.5" } },
+    { quantity: "2.5", unitPriceCop: "1000", discount: { type: "fixed", valueCop: "125" } },
+    { quantity: "1", unitPriceCop: "199", discount: { type: "percentage", value: "100" } }
+  ]);
+  assert.deepEqual(amounts.lineDiscountsCop, [125n, 313n, 199n]);
+  assert.deepEqual(amounts.lineTotalsCop, [874n, 2187n, 0n]);
+  assert.equal(amounts.totalCop, 3061n);
+  assert.deepEqual(amounts.normalizedDiscounts, [
+    { type: "percentage", value: 1250n },
+    { type: "fixed", value: 125n },
+    { type: "percentage", value: 10_000n }
+  ]);
+  assert.throws(() => calculateSaleAmounts([
+    { quantity: "1", unitPriceCop: "100", discount: { type: "fixed", valueCop: "101" } }
+  ]), /no puede superar el precio/);
+  assert.throws(() => calculateSaleAmounts([
+    { quantity: "1", unitPriceCop: "100", discount: { type: "percentage", value: "100.01" } }
+  ]), /no puede superar 100%/);
+});
+
 test("las cantidades repetidas se combinan sin aritmética de punto flotante", () => {
   assert.equal(addSaleQuantity("0.125", "0.875"), "1");
   assert.deepEqual(combineSaleQuantities([

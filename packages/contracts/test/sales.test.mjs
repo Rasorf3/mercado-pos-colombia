@@ -4,6 +4,7 @@ import { Value } from "@sinclair/typebox/value";
 import {
   PAYMENT_METHOD_OPTIONS,
   PaymentMethodSchema,
+  ProductPromotionSchema,
   SaleCreateSchema
 } from "../dist/catalog.js";
 
@@ -24,9 +25,25 @@ test("TypeBox acepta los siete métodos estables y las referencias según el mé
     payment: { method: "nequi", amountPaidCop: "1000", reference: "NEQ-01" }
   }), true);
   assert.equal(Value.Check(SaleCreateSchema, {
+    items: [{ productId: "550e8400-e29b-41d4-a716-446655440000", quantity: "2.5", discount: { type: "fixed", valueCop: "100" } }],
+    payment: { method: "cash", amountPaidCop: "1000" }
+  }), true);
+  assert.equal(Value.Check(SaleCreateSchema, {
     items: [{ productId: "550e8400-e29b-41d4-a716-446655440000", quantity: "1" }],
     payment: { method: "debit_card", amountPaidCop: "1000", authorizationCode: "AUTH01" }
   }), true);
+});
+
+test("el contrato contempla promociones tipadas con rango de fechas", () => {
+  assert.equal(Value.Check(ProductPromotionSchema, {
+    discount: { type: "percentage", value: "10.25" }, startsOn: "2026-09-01", endsOn: "2026-09-30"
+  }), true);
+  assert.equal(Value.Check(ProductPromotionSchema, {
+    discount: { type: "percentage", value: "101" }, startsOn: "2026-09-01", endsOn: "2026-09-30"
+  }), false);
+  assert.equal(Value.Check(ProductPromotionSchema, {
+    discount: { type: "fixed", valueCop: "500" }, startsOn: "2026-09-01"
+  }), false);
 });
 
 test("el contrato rechaza métodos desconocidos y datos sensibles de tarjeta", () => {

@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactElement } from "react";
 import type { InventoryAdjustmentInput, InventoryEntryInput, InventoryMovement, Product } from "@mercado-pos/contracts";
-import { calculateStockWeight } from "@mercado-pos/domain";
+import { calculateStockWeight, formatBogotaDate } from "@mercado-pos/domain";
 
 interface Props {
   product: Product;
@@ -15,6 +15,9 @@ export function ProductInspector({ product, movements, busy, onEdit, onRecordEnt
   const [movementType, setMovementType] = useState<"entry" | "adjustment">("entry");
   const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
+  const today = formatBogotaDate();
+  const promotionIsActive = product.promotion !== null
+    && today >= product.promotion.startsOn && today <= product.promotion.endsOn;
 
   const submitMovement = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -37,6 +40,11 @@ export function ProductInspector({ product, movements, busy, onEdit, onRecordEnt
         <div><span>Precio de venta</span><strong>{formatCop(product.salePriceCop)}</strong></div>
         <div><span>Costo</span><strong>{formatCop(product.costCop)}</strong></div>
       </div>
+      {product.promotion && <div className="promotion-summary">
+        <strong>{promotionIsActive ? "Promoción vigente" : "Promoción programada"}</strong>
+        <span>{product.promotion.discount.type === "percentage" ? `${product.promotion.discount.value}% de descuento` : `${formatCop(product.promotion.discount.valueCop)} menos por unidad`}</span>
+        <small>Del {product.promotion.startsOn} al {product.promotion.endsOn}. La venta guardará una copia del descuento aplicado.</small>
+      </div>}
 
       <div className="movement-editor">
         <div className="section-title"><div><h3>Actualizar existencias</h3><p>Cada cambio queda en el historial.</p></div></div>

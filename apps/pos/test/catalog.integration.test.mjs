@@ -146,3 +146,37 @@ test("persiste la equivalencia de peso opcional por empaque y admite libras", ()
     initialStock: "4", weightPerUnit: "2.5", weightUnit: "lb"
   }), /solo aplica a productos.*unidades/);
 });
+
+test("persiste promociones porcentuales o fijas y solo expone como activa la vigente", () => {
+  const todayParts = new Intl.DateTimeFormat("en", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(new Date());
+  const todayFields = new Map(todayParts.map(({ type, value }) => [type, value]));
+  const today = `${todayFields.get("year")}-${todayFields.get("month")}-${todayFields.get("day")}`;
+  const product = catalog.createProduct({
+    name: "Promoción en catálogo", internalCode: "PROMO-CATALOG", barcode: null,
+    costCop: "500", salePriceCop: "2000", unit: "unit", initialStock: "10",
+    promotion: { discount: { type: "percentage", value: "12.5" }, startsOn: today, endsOn: today }
+  });
+  assert.deepEqual(product.promotion, {
+    discount: { type: "percentage", value: "12.5" }, startsOn: today, endsOn: today
+  });
+  assert.deepEqual(catalog.listProductsForSale("PROMO-CATALOG")[0].activePromotion, { type: "percentage", value: "12.5" });
+
+  const fixed = catalog.updateProduct(product.id, {
+    name: product.name, internalCode: product.internalCode, barcode: product.barcode,
+    costCop: product.costCop, salePriceCop: product.salePriceCop, unit: product.unit, active: true,
+    promotion: { discount: { type: "fixed", valueCop: "250" }, startsOn: today, endsOn: today }
+  });
+  assert.deepEqual(fixed.promotion, {
+    discount: { type: "fixed", valueCop: "250" }, startsOn: today, endsOn: today
+  });
+  database.close();
+  database = openPosDatabase(databasePath);
+  catalog = new CatalogService(database);
+  assert.deepEqual(catalog.listProducts({ query: "PROMO-CATALOG", includeInactive: false })[0].promotion, fixed.promotion);
+  const legacyUpdate = catalog.updateProduct(fixed.id, {
+    name: fixed.name, internalCode: fixed.internalCode, barcode: fixed.barcode,
+    costCop: fixed.costCop, salePriceCop: fixed.salePriceCop, unit: fixed.unit, active: true
+  });
+  assert.deepEqual(legacyUpdate.promotion, fixed.promotion);
+});

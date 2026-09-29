@@ -5,7 +5,7 @@ Implementado y verificado el 2026-09-28 con Electron 44.4.5. Funciona offline y 
 ## Uso
 
 1. Abre **Historial** para listar ventas, filtrar desde/hasta y elegir 20, 50 o 100 resultados por página. Las fechas incluyen el día completo en Colombia (UTC−5), aunque el equipo use otra zona horaria. El orden es fecha descendente y orden de inserción para desempates.
-2. **Abrir** muestra el identificador completo, fecha, estado, líneas, cantidades, precios unitarios, importes guardados, total, pago, cambio y comprador de esa operación, si existe. Los datos no se reconstruyen desde el catálogo o el perfil actual.
+2. **Abrir** muestra el identificador completo, fecha, estado, líneas, cantidades, precios unitarios, descuento aplicado e importes guardados, total, pago, cambio y comprador de esa operación, si existe. Los datos no se reconstruyen desde el catálogo o el perfil actual.
 3. **Imprimir comprobante** abre el diálogo de impresión para elegir impresora y opciones. **Guardar PDF** abre un diálogo de ubicación. Ambas acciones están en el cierre de una venta, en su detalle y en el detalle accesible desde las ventas recientes.
 4. Una cancelación es un resultado normal y visible. Si no hay impresoras instaladas, se informa que puede usarse PDF. Un error permite reintentar sobre la misma venta. Una solicitud concurrente se rechaza mientras otra tenga el diálogo abierto.
 
@@ -18,7 +18,13 @@ Implementado y verificado el 2026-09-28 con Electron 44.4.5. Funciona offline y 
 - El controlador puede rechazar, sustituir o escalar tamaños personalizados, imponer márgenes o usar un área imprimible menor al ancho nominal. Elegir el mismo papel en sus propiedades, escala 100 % y comprobar el resultado en el dispositivo. No se garantiza un formato continuo de longitud ilimitada.
 - Electron recibe tamaño en micras para `webContents.print`, márgenes en píxeles enteros y tamaño/márgenes en pulgadas para `printToPDF`. No reutilizar las unidades de una API en la otra.
 
-La plantilla es HTML/CSS sin recursos externos y usa fuentes del sistema. Productos, comprador, identificadores y referencias se escapan como texto. Encabeza cada página con **COMPROBANTE LOCAL — NO ES FACTURA ELECTRÓNICA** y **Facturación electrónica pendiente**. Muestra los importes persistidos en COP, no recalcula totales/impuestos ni agrega numeración fiscal, CUFE, CUDE o datos DIAN. El cambio se imprime para efectivo; el detalle conserva también el valor guardado para los demás medios.
+La plantilla es HTML/CSS sin recursos externos y usa fuentes del sistema. Productos, comprador, identificadores y referencias se escapan como texto. Encabeza cada página con **COMPROBANTE LOCAL — NO ES FACTURA ELECTRÓNICA** y **Facturación electrónica pendiente**. Muestra el descuento y los importes persistidos en COP, no recalcula totales/impuestos ni agrega numeración fiscal, CUFE, CUDE o datos DIAN. El cambio se imprime para efectivo; el detalle conserva también el valor guardado para los demás medios.
+
+## Descuentos de producto
+
+En el formulario del catálogo se puede guardar una promoción porcentual (hasta dos decimales) o un valor fijo en COP por unidad/empaque, con fechas inicial y final. Ambas fechas cuentan como días completos de Colombia. En caja se activa automáticamente cuando está vigente; durante el paso de pago el cajero puede quitarla o sustituir el tipo/valor solo para esa venta. El descuento fijo se multiplica por la cantidad vendida, incluso si es fraccionaria; no puede superar el precio de venta de una unidad.
+
+Los porcentajes se almacenan como puntos básicos; los importes fijos y resultantes son enteros COP. El bruto de cada línea y su descuento se redondean por separado al COP más cercano, mitad hacia arriba; el neto de línea es bruto menos descuento. El historial y el comprobante usan la instantánea guardada. Estos descuentos comerciales no determinan ni sustituyen impuestos.
 
 ## Datos, IPC y seguridad
 

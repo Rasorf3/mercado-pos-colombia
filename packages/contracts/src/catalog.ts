@@ -25,6 +25,22 @@ export const CopIntegerSchema = Type.String({
   maxLength: 19
 });
 
+export const PercentageInputSchema = Type.String({
+  pattern: "^(?:100(?:[.,]0{1,2})?|(?:0|[1-9]\\d?)(?:[.,]\\d{1,2})?)$",
+  maxLength: 6
+});
+
+export const ProductDiscountSchema = Type.Union([
+  Type.Object({ type: Type.Literal("percentage"), value: PercentageInputSchema }, { additionalProperties: false }),
+  Type.Object({ type: Type.Literal("fixed"), valueCop: CopIntegerSchema }, { additionalProperties: false })
+]);
+
+export const ProductPromotionSchema = Type.Object({
+  discount: ProductDiscountSchema,
+  startsOn: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$", maxLength: 10 }),
+  endsOn: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$", maxLength: 10 })
+}, { additionalProperties: false });
+
 export const QuantityInputSchema = Type.String({
   pattern: "^\\d+(?:[.,]\\d{1,3})?$",
   maxLength: 24
@@ -48,6 +64,7 @@ export const ProductCreateSchema = Type.Object({
   ...ProductFields,
   weightPerUnit: Type.Optional(Type.Union([QuantityInputSchema, Type.Null()])),
   weightUnit: Type.Optional(Type.Union([ProductWeightUnitSchema, Type.Null()])),
+  promotion: Type.Optional(Type.Union([ProductPromotionSchema, Type.Null()])),
   initialStock: QuantityInputSchema
 }, { additionalProperties: false });
 
@@ -55,6 +72,7 @@ export const ProductUpdateSchema = Type.Object({
   ...ProductFields,
   weightPerUnit: Type.Optional(Type.Union([QuantityInputSchema, Type.Null()])),
   weightUnit: Type.Optional(Type.Union([ProductWeightUnitSchema, Type.Null()])),
+  promotion: Type.Optional(Type.Union([ProductPromotionSchema, Type.Null()])),
   active: Type.Boolean()
 }, { additionalProperties: false });
 
@@ -65,6 +83,7 @@ export const ProductSchema = Type.Object({
   stock: QuantityInputSchema,
   weightPerUnit: Type.Union([QuantityInputSchema, Type.Null()]),
   weightUnit: Type.Union([ProductWeightUnitSchema, Type.Null()]),
+  promotion: Type.Union([ProductPromotionSchema, Type.Null()]),
   createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
   createdAt: Type.String({ format: "date-time" }),
   updatedAt: Type.String({ format: "date-time" })
@@ -78,7 +97,8 @@ export const SaleProductSchema = Type.Object({
   salePriceCop: CopIntegerSchema,
   unit: ProductUnitSchema,
   active: Type.Boolean(),
-  stock: QuantityInputSchema
+  stock: QuantityInputSchema,
+  activePromotion: Type.Union([ProductDiscountSchema, Type.Null()])
 }, { additionalProperties: false });
 
 export const ProductSearchSchema = Type.Object({
@@ -144,7 +164,8 @@ export const SaleStatusSchema = Type.Literal("local_pending_invoice");
 
 export const SaleLineInputSchema = Type.Object({
   productId: UuidSchema,
-  quantity: QuantityInputSchema
+  quantity: QuantityInputSchema,
+  discount: Type.Optional(Type.Union([ProductDiscountSchema, Type.Null()]))
 }, { additionalProperties: false });
 
 export const SalePaymentInputSchema = Type.Object({
@@ -174,6 +195,8 @@ export const SaleLineSchema = Type.Object({
   unit: ProductUnitSchema,
   quantity: QuantityInputSchema,
   unitPriceCop: CopIntegerSchema,
+  discount: Type.Union([ProductDiscountSchema, Type.Null()]),
+  discountTotalCop: CopIntegerSchema,
   lineTotalCop: CopIntegerSchema
 }, { additionalProperties: false });
 
@@ -200,6 +223,8 @@ export const SaleSummarySchema = Type.Object({
 
 export type ProductUnit = Static<typeof ProductUnitSchema>;
 export type ProductWeightUnit = Static<typeof ProductWeightUnitSchema>;
+export type ProductDiscount = Static<typeof ProductDiscountSchema>;
+export type ProductPromotion = Static<typeof ProductPromotionSchema>;
 export type ProductCreateInput = Static<typeof ProductCreateSchema>;
 export type ProductUpdateInput = Static<typeof ProductUpdateSchema>;
 export type Product = Static<typeof ProductSchema>;

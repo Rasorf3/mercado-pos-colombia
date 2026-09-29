@@ -53,6 +53,8 @@ test("registra los siete métodos, montos y datos opcionales sin procesar el pag
       unit: "unit",
       quantity: "1.125",
       unitPriceCop: "1250",
+      discount: null,
+      discountTotalCop: "0",
       lineTotalCop: "1406"
     });
     assert.equal(sale.payment.method, method);
@@ -70,6 +72,52 @@ test("registra los siete métodos, montos y datos opcionales sin procesar el pag
   const history = sales.listRecentSales();
   assert.equal(history.length, methods.length);
   assert.deepEqual(new Set(history.map((sale) => sale.payment.method)), new Set(methods));
+});
+
+test("aplica promociones activas y guarda el descuento efectivo como instantánea de venta", () => {
+  const todayParts = new Intl.DateTimeFormat("en", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(new Date());
+  const todayFields = new Map(todayParts.map(({ type, value }) => [type, value]));
+  const today = `${todayFields.get("year")}-${todayFields.get("month")}-${todayFields.get("day")}`;
+  const product = catalog.createProduct({
+    name: "Producto promoción", internalCode: "SALE-PROMO", barcode: null,
+    costCop: "500", salePriceCop: "1000", unit: "unit", initialStock: "10",
+    promotion: { discount: { type: "percentage", value: "10" }, startsOn: today, endsOn: today }
+  });
+  assert.deepEqual(catalog.listProductsForSale("SALE-PROMO")[0].activePromotion, { type: "percentage", value: "10" });
+
+  const automatic = sales.createSale({
+    items: [{ productId: product.id, quantity: "3" }],
+    payment: { method: "cash", amountPaidCop: "2700" }
+  });
+  assert.equal(automatic.totalCop, "2700");
+  assert.deepEqual(automatic.items[0], {
+    productId: product.id, productName: product.name, unit: "unit", quantity: "3",
+    unitPriceCop: "1000", discount: { type: "percentage", value: "10" },
+    discountTotalCop: "300", lineTotalCop: "2700"
+  });
+
+  const manual = sales.createSale({
+    items: [{ productId: product.id, quantity: "2.5", discount: { type: "fixed", valueCop: "125" } }],
+    payment: { method: "cash", amountPaidCop: "2187" }
+  });
+  assert.equal(manual.totalCop, "2187");
+  assert.equal(manual.items[0].discountTotalCop, "313");
+  assert.deepEqual(manual.items[0].discount, { type: "fixed", valueCop: "125" });
+  const saleCount = database.prepare("SELECT count(*) AS count FROM sales").get().count;
+  assert.throws(() => sales.createSale({
+    items: [{ productId: product.id, quantity: "1", discount: { type: "fixed", valueCop: "1001" } }],
+    payment: { method: "cash", amountPaidCop: "0" }
+  }), /no puede superar el precio/);
+  assert.equal(database.prepare("SELECT count(*) AS count FROM sales").get().count, saleCount);
+
+  const edited = catalog.updateProduct(product.id, {
+    name: "Producto cambiado", internalCode: product.internalCode, barcode: null,
+    costCop: "600", salePriceCop: "2000", unit: "unit", active: true, promotion: null
+  });
+  assert.equal(edited.promotion, null);
+  assert.deepEqual(sales.getSale(automatic.id).items[0], automatic.items[0]);
+  assert.deepEqual(sales.getSale(manual.id).items[0], manual.items[0]);
 });
 
 test("revierte venta, pago, líneas, movimientos y stock si falla al registrar el movimiento", () => {

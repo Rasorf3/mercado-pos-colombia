@@ -91,6 +91,24 @@ test("el historial persiste instantáneas e importes exactos y escapa todos los 
   assert.match(original, /Facturación electrónica pendiente/);
 });
 
+test("el comprobante local imprime el descuento congelado de la línea", (t) => {
+  const database = openPosDatabase(":memory:");
+  t.after(() => database.close());
+  const { sales } = seed(database);
+  const product = new CatalogService(database).createProduct({
+    name: "Producto con descuento", internalCode: "RECEIPT-DISCOUNT", barcode: null,
+    costCop: "500", salePriceCop: "1000", unit: "unit", initialStock: "2"
+  });
+  const sale = sales.createSale({
+    items: [{ productId: product.id, quantity: "1", discount: { type: "percentage", value: "10" } }],
+    payment: { method: "cash", amountPaidCop: "900" }
+  });
+  const html = renderReceipt(sale, layout);
+  assert.equal(sale.totalCop, "900");
+  assert.equal(sale.items[0].discountTotalCop, "100");
+  assert.match(html, /Descuento 10%:/);
+});
+
 test("paginación estable, vacíos y límites inclusivos por fecha colombiana", (t) => {
   const database = openPosDatabase(":memory:");
   t.after(() => database.close());

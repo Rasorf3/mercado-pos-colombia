@@ -19,10 +19,10 @@ export function SaleDetail({ sale, onClose }: { sale: Sale; onClose: () => void 
       <p><strong>Registró:</strong> {sale.createdByUsername ?? "Usuario histórico no identificado"}</p>
       <p>Datos e importes conservados al registrar la venta.</p>
       <div className="table-scroll"><table className="sale-detail-table">
-        <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Importe guardado</th></tr></thead>
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Descuento</th><th>Importe guardado</th></tr></thead>
         <tbody>{sale.items.map((item) => <tr key={item.productId}>
           <td>{item.productName}</td><td>{item.quantity} {saleUnit(item.unit)}</td>
-          <td>{saleMoney(item.unitPriceCop)}</td><td>{saleMoney(item.lineTotalCop)}</td>
+          <td>{saleMoney(item.unitPriceCop)}</td><td>{item.discount ? `${item.discount.type === "percentage" ? `${item.discount.value}%` : `${saleMoney(item.discount.valueCop)} por unidad`} · ${saleMoney(item.discountTotalCop)}` : "—"}</td><td>{saleMoney(item.lineTotalCop)}</td>
         </tr>)}</tbody>
       </table></div>
       <div className="sale-detail-summary">

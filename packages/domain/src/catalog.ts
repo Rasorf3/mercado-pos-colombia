@@ -1,3 +1,5 @@
+import { normalizeProductPromotion, type NormalizedProductPromotion, type ProductPromotionDraft } from "./discounts.js";
+
 export const PRODUCT_UNITS = ["unit", "kg", "g", "l", "ml", "m"] as const;
 export type ProductUnit = typeof PRODUCT_UNITS[number];
 export const PRODUCT_WEIGHT_UNITS = ["g", "kg", "lb"] as const;
@@ -13,6 +15,7 @@ export interface ProductDraftInput {
   unit: string;
   weightPerUnit?: string | null;
   weightUnit?: string | null;
+  promotion?: ProductPromotionDraft | null;
 }
 
 export interface NormalizedProductDraft {
@@ -24,6 +27,7 @@ export interface NormalizedProductDraft {
   unit: ProductUnit;
   weightPerUnitMilli: bigint | null;
   weightUnit: ProductWeightUnit | null;
+  promotion: NormalizedProductPromotion | null;
 }
 
 export const MAX_SQLITE_INTEGER = 9_223_372_036_854_775_807n;
@@ -130,15 +134,19 @@ export function normalizeProductDraft(input: ProductDraftInput): NormalizedProdu
     throw new DomainValidationError("El peso por unidad debe ser mayor que cero.");
   }
 
+  const salePriceCop = parseCopInteger(input.salePriceCop);
+  const promotion = normalizeProductPromotion(input.promotion, salePriceCop);
+
   return {
     name,
     internalCode,
     barcode,
     costCop: parseCopInteger(input.costCop),
-    salePriceCop: parseCopInteger(input.salePriceCop),
+    salePriceCop,
     unit: input.unit as ProductUnit,
     weightPerUnitMilli,
-    weightUnit: rawWeightUnit as ProductWeightUnit | null
+    weightUnit: rawWeightUnit as ProductWeightUnit | null,
+    promotion
   };
 }
 
