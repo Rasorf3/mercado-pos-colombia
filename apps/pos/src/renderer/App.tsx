@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement
+} from "react";
 import type {
   InventoryAdjustmentInput,
   InventoryEntryInput,
@@ -15,6 +22,9 @@ import { ClientsScreen } from "./ClientsScreen";
 import { SalesHistoryScreen } from "./SalesHistoryScreen";
 import "./salesHistory.css";
 
+const FONT_SIZE_STEPS = [100, 110, 120, 130, 140, 150] as const;
+const FONT_SIZE_STORAGE_KEY = "mercado-pos-font-size";
+
 export function App(): ReactElement {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -25,11 +35,20 @@ export function App(): ReactElement {
   const [activePage, setActivePage] = useState<"catalog" | "sales" | "clients" | "history">("catalog");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fontScale, setFontScale] = useState(readFontScale);
   const searchRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef(0);
   const movementRequestRef = useRef(0);
   const platform = window.electronAPI.platform;
   const selectedProduct = products.find((product) => product.id === selectedId) ?? null;
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontScale));
+    } catch {
+      // La preferencia se aplica durante esta sesión aunque el almacenamiento no esté disponible.
+    }
+  }, [fontScale]);
 
   const loadProducts = useCallback(async (input: ProductSearchInput) => {
     const requestId = ++requestRef.current;
@@ -177,7 +196,7 @@ export function App(): ReactElement {
   };
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" style={{ "--font-scale": fontScale / 100 } as CSSProperties}>
       <header className="topbar">
         <a className="brand" href="#catalog" aria-label="Mercado POS inicio">
           <span className="brand-icon" aria-hidden="true">M</span>
@@ -189,6 +208,32 @@ export function App(): ReactElement {
           <button className={activePage === "clients" ? "current" : ""} onClick={() => setActivePage("clients")}>Clientes</button>
           <button className={activePage === "history" ? "current" : ""} onClick={() => setActivePage("history")}>Historial</button>
         </nav>
+        <div className="font-size-control" role="group" aria-label="Tamaño de letra">
+          <span aria-hidden="true">Texto</span>
+          <button
+            type="button"
+            aria-label="Reducir tamaño de letra"
+            title="Reducir tamaño de letra"
+            disabled={fontScale === FONT_SIZE_STEPS[0]}
+            onClick={() => setFontScale((current) => FONT_SIZE_STEPS[Math.max(0, FONT_SIZE_STEPS.indexOf(current) - 1)])}
+          >A−</button>
+          <output aria-live="polite" aria-atomic="true">{fontScale}%</output>
+          <button
+            type="button"
+            aria-label="Aumentar tamaño de letra"
+            title="Aumentar tamaño de letra"
+            disabled={fontScale === FONT_SIZE_STEPS[FONT_SIZE_STEPS.length - 1]}
+            onClick={() => setFontScale((current) => FONT_SIZE_STEPS[Math.min(FONT_SIZE_STEPS.length - 1, FONT_SIZE_STEPS.indexOf(current) + 1)])}
+          >A+</button>
+          <button
+            className="font-size-reset"
+            type="button"
+            aria-label="Restablecer tamaño de letra"
+            title="Restablecer tamaño de letra"
+            disabled={fontScale === 100}
+            onClick={() => setFontScale(100)}
+          >↺</button>
+        </div>
         <div className="local-status"><span className="status-light" /> Operación local <span className="status-divider">·</span> {platform}</div>
       </header>
 
@@ -244,6 +289,16 @@ export function App(): ReactElement {
       <footer className="app-footer"><span>Mercado POS Colombia</span><span>{activePage === "catalog" ? "Catálogo local · Sin conexión requerida" : activePage === "clients" ? "Clientes locales · Perfiles opcionales" : "Venta local · Pendiente de facturación electrónica"}</span></footer>
     </main>
   );
+}
+
+function readFontScale(): (typeof FONT_SIZE_STEPS)[number] {
+  try {
+    const stored = window.localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+    const value = Number(stored);
+    return FONT_SIZE_STEPS.find((step) => step === value) ?? 100;
+  } catch {
+    return 100;
+  }
 }
 
 function formatCop(value: string): string {

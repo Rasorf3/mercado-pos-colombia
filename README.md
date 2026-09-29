@@ -46,6 +46,8 @@ El documento muestra **COMPROBANTE LOCAL — NO ES FACTURA ELECTRÓNICA** y mant
 
 Consulta los límites, las pruebas y la reproducción de PDFs sintéticos en [`docs/local-sales-history-and-receipts.md`](docs/local-sales-history-and-receipts.md).
 
+En cualquier sección, usa **A−** y **A+** en la barra superior para ajustar el tamaño de letra entre 100 % y 150 %; **↺** lo restablece. La preferencia se guarda localmente en esta caja.
+
 ## Estructura
 
 ```text
