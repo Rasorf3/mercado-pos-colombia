@@ -2,6 +2,8 @@
 
 La integración productiva con la DIAN está fuera del alcance del esqueleto actual.
 
+El diseño documental de opciones, habilitación, estados, contingencias, requisitos de datos y controles de reintento está en [`dian/electronic-invoicing-design.md`](dian/electronic-invoicing-design.md). Fue contrastado con fuentes oficiales consultadas el 2026-09-28; no implementa llamadas ni habilita producción.
+
 ## No implementado
 
 - No hay llamadas HTTP a servicios de la DIAN.

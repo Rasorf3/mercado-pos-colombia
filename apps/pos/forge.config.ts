@@ -1,11 +1,43 @@
+import { cp } from "node:fs/promises";
+import { relative, resolve } from "node:path";
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { WebpackPlugin } from "@electron-forge/plugin-webpack";
 
+const workspaceNodeModules = resolve(process.cwd(), "../../node_modules");
+
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true
+    prune: false,
+    asar: {
+      unpack: "**/*.node"
+    }
   },
-  rebuildConfig: {},
+  hooks: {
+    packageAfterCopy: async (_forgeConfig, buildPath, _electronVersion, platform, arch) => {
+      const targetNodeModules = resolve(buildPath, "node_modules");
+      const sqlitePackage = resolve(workspaceNodeModules, "better-sqlite3");
+      const targetSqlitePackage = resolve(targetNodeModules, "better-sqlite3");
+      const nativeBinary = `prebuilds/${platform}-${arch}.node`;
+
+      // The Forge webpack plugin intentionally copies only .webpack. Copy the
+      // external native runtime dependency into the packaged app explicitly.
+      await cp(sqlitePackage, targetSqlitePackage, {
+        recursive: true,
+        filter: (source) => {
+          const pathFromPackage = relative(sqlitePackage, source).replaceAll("\\", "/");
+          return pathFromPackage === "" ||
+            pathFromPackage === "package.json" ||
+            pathFromPackage === "lib" ||
+            pathFromPackage.startsWith("lib/") ||
+            pathFromPackage === "prebuilds" ||
+            pathFromPackage === nativeBinary;
+        }
+      });
+    }
+  },
+  rebuildConfig: {
+    onlyModules: []
+  },
   plugins: [
     new WebpackPlugin({
       mainConfig: "./webpack.main.config.ts",

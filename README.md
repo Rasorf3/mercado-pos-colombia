@@ -1,8 +1,8 @@
 # Mercado POS Colombia
 
-Esqueleto de un sistema de punto de venta para Colombia. El proyecto usa Node.js 24, npm workspaces, Electron Forge con React para la caja local y Fastify para la API.
+Aplicación local de catálogo, inventario y ventas mínimas para un punto de venta en Colombia. Usa Node.js 24, npm workspaces, Electron Forge con React para la caja y Fastify para una API separada.
 
-Esta primera versión solo comprueba que las piezas arrancan y compilan. No incluye ventas, facturación electrónica real, conexión de producción con la DIAN, sincronización con PostgreSQL ni datos reales.
+La caja registra ventas locales offline en SQLite con descuento de existencias y un medio de pago declarado. Permite mantener clientes locales opcionales y asociarlos a una venta; las ventas conservan una instantánea histórica del comprador. Incluye historial paginado, detalle e impresión o exportación PDF de comprobantes locales de 58 y 80 mm. Las ventas quedan pendientes de integración con facturación electrónica: no se emiten ni se envían a la DIAN. No incluye procesamiento o verificación de pagos, sincronización con PostgreSQL, proveedores ni suscripciones.
 
 ## Requisitos
 
@@ -20,7 +20,7 @@ npm install
 Desde la raíz del repositorio:
 
 ```bash
-npm run dev:pos     # inicia la caja Electron + React
+npm run dev:pos     # compila contratos/dominio e inicia la caja Electron + React
 npm run dev:api     # inicia la API Fastify en http://127.0.0.1:3000
 npm run typecheck   # valida los tipos de la API y la caja
 npm run test        # ejecuta las pruebas configuradas
@@ -36,6 +36,16 @@ curl http://127.0.0.1:3000/health
 
 La respuesta esperada tiene `status: "ok"`, identifica el servicio `api` y contiene una marca de tiempo ISO-8601.
 
+## Historial y comprobantes locales
+
+En **Historial**, filtra por fechas inclusivas del calendario colombiano (UTC−5), elige 20, 50 o 100 ventas por página y abre una venta para consultar sus datos guardados. Cambiar luego el catálogo o el cliente no modifica esa información.
+
+Puedes **Imprimir comprobante** o **Guardar PDF** al terminar una venta y desde su detalle. Elige papel de 58/80 mm; en los ajustes puedes indicar márgenes de 2–8 mm y largo por página de 100–400 mm. La impresión abre el diálogo del sistema y el PDF pide una ubicación. Los ajustes se recuerdan localmente. Revisa el mismo tamaño en el controlador y la escala al 100 %; el área imprimible depende de la impresora.
+
+El documento muestra **COMPROBANTE LOCAL — NO ES FACTURA ELECTRÓNICA** y mantiene visible la facturación electrónica pendiente. Reimprimir no crea ventas ni descuenta existencias.
+
+Consulta los límites, las pruebas y la reproducción de PDFs sintéticos en [`docs/local-sales-history-and-receipts.md`](docs/local-sales-history-and-receipts.md).
+
 ## Estructura
 
 ```text
@@ -45,7 +55,7 @@ La respuesta esperada tiene `status: "ok"`, identifica el servicio `api` y conti
 │   └── pos/          # Electron Forge + React + TypeScript
 ├── packages/
 │   ├── contracts/    # Contratos TypeBox compartidos
-│   └── domain/       # Futuras reglas de negocio
+│   └── domain/       # Reglas puras de catálogo, inventario y ventas
 ├── docs/             # Arquitectura, offline y DIAN
 ├── package.json      # Workspaces y comandos raíz
 └── tsconfig.base.json
@@ -54,8 +64,14 @@ La respuesta esperada tiene `status: "ok"`, identifica el servicio `api` y conti
 ## Límites de seguridad de esta etapa
 
 - `.env.example` contiene únicamente valores locales de ejemplo.
-- SQLite está reservado para la futura caja local; no se incluye ninguna base de datos.
-- No se guardan certificados digitales, credenciales, tokens ni datos de clientes.
+- La base SQLite se crea en el directorio local de datos de Electron, nunca dentro del repositorio.
+- Los importes se guardan como enteros COP; cantidades como milésimas enteras para evitar cálculos de punto flotante.
+- Cada venta conserva nombre, unidad, precio y cantidad en sus líneas. Se redondea half-up al peso por línea y se suman las líneas; no se calculan impuestos.
+- Nombre/razón social, tipo y número de identificación y correo son los únicos datos del perfil local de cliente; identificación y correo son opcionales y no se recopilan dirección ni teléfono. Una venta no requiere cliente.
+- Venta, instantánea opcional del comprador, pago y salidas de inventario se guardan en una transacción SQLite; el estado es `local_pending_invoice`, nunca una factura DIAN. La instantánea no cambia si luego se edita o desactiva el perfil.
+- Solo se registra un método por venta. No se procesan tarjetas ni se verifican transferencias; las referencias/códigos opcionales no reemplazan credenciales.
+- El acceso a SQLite ocurre solo en el proceso principal de Electron. El renderer recibe operaciones limitadas mediante `preload`.
+- No se guardan certificados digitales, credenciales ni tokens. Los datos de clientes viven solo en la SQLite local de la caja.
 - La documentación de DIAN describe decisiones pendientes y no habilita llamadas externas.
 
 Consulta [`AGENTS.md`](AGENTS.md) antes de ampliar el proyecto.

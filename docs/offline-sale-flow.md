@@ -1,26 +1,31 @@
 # Flujo de venta offline
 
-Este documento describe el flujo previsto; todavía no es una implementación.
+La caja ya implementa la captura local mínima descrita abajo. La sincronización y facturación electrónica siguen pendientes.
 
 ## Flujo propuesto
 
-1. La caja carga productos y configuración previamente sincronizados.
-2. El cajero arma un carrito en el renderer.
-3. Un comando explícito atraviesa `preload` hacia el proceso principal.
-4. El dominio valida la operación y calcula los totales.
-5. La operación se guarda en SQLite local con un identificador único.
-6. La pantalla muestra el comprobante local y el estado `pending_sync`.
-7. Un sincronizador futuro enviará operaciones pendientes a la API cuando exista conectividad.
-8. La API validará contratos y persistirá en PostgreSQL cuando esa etapa sea implementada.
+1. El renderer carga productos activos desde SQLite por una capacidad limitada de `preload`.
+2. El cajero arma un carrito con cantidades de hasta tres decimales, puede buscar y asociar un cliente existente (opcional) y elige un solo método de pago.
+3. El proceso principal relee productos, precios y existencias; el dominio valida cantidades, total COP y pago.
+4. Una transacción SQLite inserta venta local, instantáneas de sus líneas y del comprador elegido, pago, salidas de inventario y saldos nuevos.
+5. Si una escritura falla, SQLite revierte la venta, instantáneas, pago, movimientos y saldos.
+6. La pantalla informa `local_pending_invoice`: no es factura electrónica y no se ha emitido ni aceptado por la DIAN.
+7. No se procesa la tarjeta ni se verifica transferencia, Nequi, DaviPlata o Bre-B. Las referencias y códigos de autorización son solo datos opcionales declarados.
+8. La sincronización hacia la API/PostgreSQL y la facturación electrónica son trabajo futuro.
+
+Después del cierre, la pantalla permite imprimir o guardar un comprobante local en PDF. El historial permite volver a consultar la venta por fecha y abrir su detalle; todos los importes, líneas, pago y comprador provienen de las instantáneas guardadas en SQLite. La edición posterior de productos/clientes no interviene en estas lecturas.
+
+Las solicitudes de impresión/exportación incluyen solo el identificador de la venta y las preferencias de papel. El proceso principal vuelve a leer esa venta existente; no registra otra venta ni modifica inventario, pagos o estado fiscal. Cancelar el diálogo o fallar la impresora/PDF deja la venta disponible para reintentar. Ver [`local-sales-history-and-receipts.md`](local-sales-history-and-receipts.md).
+
+El módulo local de clientes permite crear, editar, buscar y desactivar perfiles. Solo conserva nombre/razón social, tipo y número de identificación y correo; el cliente puede omitirse al vender. Las instantáneas de comprador no se reescriben cuando cambia el perfil.
 
 ## Estados previstos
 
 ```text
-draft → committed_local → pending_sync → synced
-                         ↘ rejected
+borrador → local_pending_invoice → (integración fiscal futura)
 ```
 
-Los nombres y las transiciones son de diseño inicial y no deben interpretarse como contratos estables todavía.
+No se declara estado de sincronización o estado DIAN en esta etapa. El total suma subtotales por línea; cada línea se redondea half-up al peso COP más cercano. No se calculan impuestos.
 
 ## Reglas de seguridad
 

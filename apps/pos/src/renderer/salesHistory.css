@@ -1,0 +1,29 @@
+.history-card, .sale-detail-card { padding: 20px; border: 1px solid #e2eae5; border-radius: 10px; background: white; }
+.history-filters, .receipt-buttons, .history-pagination { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.history-filters label, .receipt-buttons label { display: grid; gap: 5px; color: #455e54; font-size: 12px; }
+.history-filters input, .history-filters select, .receipt-buttons input, .receipt-buttons select { min-height: 34px; padding: 5px 8px; border: 1px solid #ceddd5; border-radius: 5px; background: white; color: #253e32; font: inherit; }
+.receipt-buttons input { width: 100px; }
+.history-note, .receipt-settings, .receipt-actions > p { font-size: 12px; line-height: 1.5; color: #5e7168; }
+.history-table { min-width: 760px; }
+.history-table td { font-size: 12px; white-space: normal; }
+.history-table .sale-internal-id { max-width: 200px; }
+.sale-internal-id { overflow-wrap: anywhere; }
+.history-pagination { justify-content: center; align-items: center; padding-top: 18px; font-size: 12px; }
+.sale-detail-card { font-size: 13px; line-height: 1.5; color: #32493d; }
+.sale-detail-table { min-width: 600px; }
+.sale-detail-table td { font-size: 13px; white-space: normal; overflow-wrap: anywhere; }
+.sale-detail-table td:first-child { width: 40%; }
+.sale-detail-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 18px 0; }
+.sale-detail-summary section { min-width: 0; overflow-wrap: anywhere; }
+.sale-detail-summary h2 { font-size: 15px; }
+.receipt-actions { width: 100%; border-top: 1px solid #dce6df; margin-top: 12px; padding-top: 12px; }
+.receipt-settings { margin-top: 10px; }
+.receipt-settings summary { cursor: pointer; }
+.receipt-settings .receipt-buttons { margin-top: 10px; }
+.receipt-error, .receipt-actions > .receipt-error { color: #a03227; }
+.sale-completed-banner { flex-wrap: wrap; }
+.recent-sale-row { grid-template-columns: minmax(110px, 1.2fr) minmax(90px, 1fr) auto auto auto; }
+@media (max-width: 900px) {
+  .recent-sale-row { grid-template-columns: 1fr 1fr auto; padding: 10px 0; }
+  .sale-detail-summary { grid-template-columns: 1fr; gap: 6px; }
+}

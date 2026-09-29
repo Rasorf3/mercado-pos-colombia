@@ -1,29 +1,259 @@
-import type { ReactElement } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import type {
+  InventoryAdjustmentInput,
+  InventoryEntryInput,
+  InventoryMovement,
+  Product,
+  ProductCreateInput,
+  ProductSearchInput,
+  ProductUpdateInput
+} from "@mercado-pos/contracts";
+import { ProductForm } from "./ProductForm";
+import { ProductInspector } from "./ProductInspector";
+import { SalesScreen } from "./SalesScreen";
+import { ClientsScreen } from "./ClientsScreen";
+import { SalesHistoryScreen } from "./SalesHistoryScreen";
+import "./salesHistory.css";
 
 export function App(): ReactElement {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [search, setSearch] = useState("");
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const [editing, setEditing] = useState<Product | null | undefined>(undefined);
+  const [activePage, setActivePage] = useState<"catalog" | "sales" | "clients" | "history">("catalog");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const requestRef = useRef(0);
+  const movementRequestRef = useRef(0);
   const platform = window.electronAPI.platform;
+  const selectedProduct = products.find((product) => product.id === selectedId) ?? null;
+
+  const loadProducts = useCallback(async (input: ProductSearchInput) => {
+    const requestId = ++requestRef.current;
+    try {
+      const result = await window.electronAPI.catalog.listProducts(input);
+      if (requestRef.current === requestId) {
+        setProducts(result);
+        if (selectedId && !result.some((product) => product.id === selectedId)) {
+          movementRequestRef.current += 1;
+          setSelectedId(null);
+          setMovements([]);
+        }
+      }
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (activePage !== "catalog") return;
+    const timer = window.setTimeout(() => {
+      void loadProducts({ query: search, includeInactive });
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [activePage, includeInactive, loadProducts, search]);
+
+  const selectProduct = async (product: Product) => {
+    const requestId = ++movementRequestRef.current;
+    setSelectedId(product.id);
+    setSearch("");
+    try {
+      const result = await window.electronAPI.catalog.listMovements(product.id);
+      if (movementRequestRef.current === requestId) setMovements(result);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      searchRef.current?.focus();
+    }
+  };
+
+  const searchBarcode = async () => {
+    const scannedCode = search.trim();
+    if (!scannedCode) return;
+    requestRef.current += 1;
+    setMessage("");
+    try {
+      const result = await window.electronAPI.catalog.listProducts({ query: scannedCode, includeInactive: false });
+      setProducts(result);
+      const exact = result.find((product) => product.barcode === scannedCode && product.active);
+      if (exact) {
+        await selectProduct(exact);
+        setMessage(`Producto encontrado: ${exact.name}`);
+      } else {
+        setMessage("No se encontró un producto activo con ese código de barras.");
+      }
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    }
+  };
+
+  const saveNewProduct = async (input: ProductCreateInput): Promise<boolean> => {
+    setBusy(true);
+    try {
+      const created = await window.electronAPI.catalog.createProduct(input);
+      setEditing(undefined);
+      setSearch("");
+      setIncludeInactive(false);
+      setProducts(await window.electronAPI.catalog.listProducts({ query: "", includeInactive: false }));
+      setSelectedId(created.id);
+      setMovements(await window.electronAPI.catalog.listMovements(created.id));
+      searchRef.current?.focus();
+      setMessage("Producto creado y existencia inicial registrada.");
+      return true;
+    } catch (error) {
+      setMessage(errorMessage(error));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveProductChanges = async (id: string, input: ProductUpdateInput): Promise<boolean> => {
+    setBusy(true);
+    try {
+      const updated = await window.electronAPI.catalog.updateProduct(id, input);
+      const nextProducts = await window.electronAPI.catalog.listProducts({ query: search, includeInactive });
+      setProducts(nextProducts);
+      if (nextProducts.some((product) => product.id === id)) setSelectedId(id);
+      else {
+        setSelectedId(null);
+        setMovements([]);
+      }
+      setEditing(undefined);
+      setMessage(updated.active ? "Producto actualizado." : "Producto desactivado.");
+      searchRef.current?.focus();
+      return true;
+    } catch (error) {
+      setMessage(errorMessage(error));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recordEntry = async (input: InventoryEntryInput): Promise<boolean> => {
+    setBusy(true);
+    try {
+      await window.electronAPI.catalog.recordEntry(input);
+      await refreshProductAndMovements(input.productId);
+      setMessage("Entrada de inventario registrada.");
+      return true;
+    } catch (error) {
+      setMessage(errorMessage(error));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recordAdjustment = async (input: InventoryAdjustmentInput): Promise<boolean> => {
+    setBusy(true);
+    try {
+      await window.electronAPI.catalog.recordAdjustment(input);
+      await refreshProductAndMovements(input.productId);
+      setMessage("Ajuste de inventario registrado.");
+      return true;
+    } catch (error) {
+      setMessage(errorMessage(error));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const refreshProductAndMovements = async (productId: string) => {
+    const [nextProducts, nextMovements] = await Promise.all([
+      window.electronAPI.catalog.listProducts({ query: search, includeInactive }),
+      window.electronAPI.catalog.listMovements(productId)
+    ]);
+    setProducts(nextProducts);
+    setMovements(nextMovements);
+  };
 
   return (
-    <main className="shell">
-      <section className="welcome-card" aria-labelledby="welcome-title">
-        <div className="brand-mark" aria-hidden="true">
-          POS
-        </div>
-        <p className="eyebrow">Mercado POS Colombia</p>
-        <h1 id="welcome-title">La caja está lista para crecer.</h1>
-        <p className="intro">
-          Electron y React arrancaron correctamente. Esta pantalla es el punto
-          de entrada para la futura operación offline de la caja.
-        </p>
-        <div className="status" role="status">
-          <span className="status-dot" aria-hidden="true" />
-          Entorno local activo · {platform}
-        </div>
-        <p className="note">
-          Las ventas, la persistencia y la integración DIAN se incorporarán en
-          etapas posteriores.
-        </p>
+    <main className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="#catalog" aria-label="Mercado POS inicio">
+          <span className="brand-icon" aria-hidden="true">M</span>
+          <span><strong>mercado</strong><small>punto de venta</small></span>
+        </a>
+        <nav className="top-nav" aria-label="Secciones de caja">
+          <button className={activePage === "catalog" ? "current" : ""} onClick={() => setActivePage("catalog")}>Catálogo</button>
+          <button className={activePage === "sales" ? "current" : ""} onClick={() => setActivePage("sales")}>Nueva venta</button>
+          <button className={activePage === "clients" ? "current" : ""} onClick={() => setActivePage("clients")}>Clientes</button>
+          <button className={activePage === "history" ? "current" : ""} onClick={() => setActivePage("history")}>Historial</button>
+        </nav>
+        <div className="local-status"><span className="status-light" /> Operación local <span className="status-divider">·</span> {platform}</div>
+      </header>
+
+      {activePage === "history" ? <SalesHistoryScreen /> : activePage === "clients" ? <ClientsScreen /> : activePage === "sales" ? <SalesScreen onBackToCatalog={() => setActivePage("catalog")} /> : <>
+      <section className="page-heading">
+        <div><p className="eyebrow">Administración de productos</p><h1>Catálogo e inventario</h1><p className="subheading">Tus productos y existencias, disponibles incluso sin internet.</p></div>
+        <button className="primary-button" onClick={() => { setMessage(""); setEditing(null); }}><span aria-hidden="true">＋</span> Nuevo producto</button>
       </section>
+
+      <section className="catalog-layout" id="catalog">
+        <div className="catalog-column">
+          <div className="search-toolbar">
+            <label className="search-box">
+              <span className="search-icon" aria-hidden="true">⌕</span>
+              <input ref={searchRef} autoFocus type="search" value={search} placeholder="Buscar producto, código o escanear barras…" aria-label="Buscar producto o escanear código de barras" onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchBarcode(); } }} />
+              <kbd>Enter</kbd>
+            </label>
+            <label className="inactive-toggle"><input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} /> Inactivos</label>
+          </div>
+          <p className="scanner-hint"><span aria-hidden="true">⌁</span> Lector USB: deja este campo enfocado, escanea el código y confirma con Enter.</p>
+
+          <div className="product-list-card">
+            <div className="list-heading"><div><h2>Productos</h2><span>{products.length} en esta búsqueda</span></div><span className="offline-badge"><i /> Guardado en este equipo</span></div>
+            {products.length === 0 ? (
+              <div className="empty-state"><span className="empty-icon" aria-hidden="true">▤</span><h3>{search ? "No hay coincidencias" : "Aún no hay productos"}</h3><p>{search ? "Prueba con otro nombre, código interno o código de barras." : "Crea el primer producto para comenzar a llevar tus existencias."}</p>{!search && <button className="text-button" onClick={() => setEditing(null)}>Crear primer producto <span aria-hidden="true">→</span></button>}</div>
+            ) : (
+              <div className="table-scroll"><table>
+                <thead><tr><th>Producto</th><th>Código</th><th>Existencia</th><th>Precio</th><th>Estado</th></tr></thead>
+                <tbody>{products.map((product) => (
+                  <tr key={product.id} className={selectedId === product.id ? "selected-row" : ""} onClick={() => { setEditing(undefined); void selectProduct(product); }} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setEditing(undefined); void selectProduct(product); } }}>
+                    <td><strong className="product-name">{product.name}</strong><small>{product.barcode ? `Barras · ${product.barcode}` : "Sin código de barras"}</small></td>
+                    <td className="code-cell">{product.internalCode}</td>
+                    <td><strong>{product.stock}</strong><small>{unitLabel(product.unit)}</small></td>
+                    <td className="money-cell">{formatCop(product.salePriceCop)}</td>
+                    <td><span className={`state-pill ${product.active ? "active" : "inactive"}`}>{product.active ? "Activo" : "Inactivo"}</span></td>
+                  </tr>
+                ))}</tbody>
+              </table></div>
+            )}
+          </div>
+        </div>
+
+        <aside className="inspector-column">
+          {editing !== undefined ? <ProductForm key={editing?.id ?? "new-product"} product={editing ?? null} busy={busy} onCancel={() => { setEditing(undefined); window.setTimeout(() => searchRef.current?.focus(), 0); }} onCreate={saveNewProduct} onUpdate={saveProductChanges} />
+            : selectedProduct ? <ProductInspector product={selectedProduct} movements={movements} busy={busy} onEdit={() => setEditing(selectedProduct)} onRecordEntry={recordEntry} onRecordAdjustment={recordAdjustment} />
+              : <div className="inspector-empty"><span aria-hidden="true">◉</span><h2>Detalle del producto</h2><p>Selecciona un producto para revisar sus movimientos o administrar sus existencias.</p></div>}
+        </aside>
+      </section>
+
+      {message && <div className="toast" role="status"><span>{message}</span><button aria-label="Cerrar mensaje" onClick={() => setMessage("")}>×</button></div>}
+      </>}
+
+      <footer className="app-footer"><span>Mercado POS Colombia</span><span>{activePage === "catalog" ? "Catálogo local · Sin conexión requerida" : activePage === "clients" ? "Clientes locales · Perfiles opcionales" : "Venta local · Pendiente de facturación electrónica"}</span></footer>
     </main>
   );
+}
+
+function formatCop(value: string): string {
+  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(BigInt(value));
+}
+
+function unitLabel(unit: Product["unit"]): string {
+  return ({ unit: "unidad", kg: "kg", g: "g", l: "L", ml: "ml", m: "m" })[unit];
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Ocurrió un error al procesar la solicitud.";
 }

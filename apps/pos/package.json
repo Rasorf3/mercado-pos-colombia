@@ -10,21 +10,26 @@
     "make": "electron-forge make",
     "build": "electron-forge package",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test"
+    "test": "node --experimental-strip-types --test"
   },
   "dependencies": {
+    "@mercado-pos/contracts": "0.1.0",
+    "@mercado-pos/domain": "0.1.0",
+    "@sinclair/typebox": "^0.34.33",
+    "better-sqlite3": "^13.0.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.8.3",
     "@electron-forge/plugin-webpack": "^7.8.3",
-    "electron": "^37.2.6",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@types/webpack-env": "^1.18.8",
     "css-loader": "^7.1.2",
+    "electron": "^44.4.5",
     "html-webpack-plugin": "^5.6.3",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.5.2",

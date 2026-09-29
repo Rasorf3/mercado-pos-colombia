@@ -12,7 +12,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:pos": "npm run start --workspace @mercado-pos/pos",
+    "dev:pos": "npm run build:packages && npm run start --workspace @mercado-pos/pos",
     "dev:api": "npm run dev --workspace @mercado-pos/api",
     "typecheck": "npm run build:packages && npm run typecheck --workspace @mercado-pos/api && npm run typecheck --workspace @mercado-pos/pos",
     "test": "npm run build:packages && npm run test --workspaces --if-present",
@@ -21,7 +21,6 @@
     "verify": "npm run build && npm run test"
   },
   "allowScripts": {
-    "electron@37.10.3": true,
     "esbuild@0.28.2": true
   }
 }

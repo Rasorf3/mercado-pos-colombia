@@ -1,0 +1,173 @@
+import {
+  MAX_SQLITE_INTEGER,
+  DomainValidationError,
+  formatQuantityMilli,
+  parseCopInteger,
+  parseQuantityMilli
+} from "./catalog.js";
+
+export const PAYMENT_METHOD_IDS = [
+  "cash",
+  "debit_card",
+  "credit_card",
+  "bank_transfer",
+  "nequi",
+  "daviplata",
+  "bre_b"
+] as const;
+
+export type PaymentMethodId = typeof PAYMENT_METHOD_IDS[number];
+
+export interface SaleAmountLineInput {
+  quantity: string;
+  unitPriceCop: string;
+}
+
+export interface SalePaymentDraft {
+  method: string;
+  amountPaidCop: string;
+  reference?: string;
+  authorizationCode?: string;
+}
+
+export interface NormalizedSalePayment {
+  method: PaymentMethodId;
+  amountPaidCop: bigint;
+  changeCop: bigint;
+  reference: string | null;
+  authorizationCode: string | null;
+}
+
+export function calculateSaleAmounts(lines: SaleAmountLineInput[]): {
+  lineTotalsCop: bigint[];
+  totalCop: bigint;
+} {
+  if (lines.length === 0 || lines.length > 100) {
+    throw new DomainValidationError("La venta debe incluir entre 1 y 100 productos.");
+  }
+
+  let totalCop = 0n;
+  const lineTotalsCop = lines.map(({ quantity: rawQuantity, unitPriceCop: rawPrice }) => {
+    const quantityMilli = parseQuantityMilli(rawQuantity);
+    if (quantityMilli === 0n) {
+      throw new DomainValidationError("La cantidad de cada producto debe ser mayor que cero.");
+    }
+
+    const unitPriceCop = parseCopInteger(rawPrice);
+    const numerator = unitPriceCop * quantityMilli;
+    // Price is COP per unit and quantity is in thousandths; round each line half-up to whole COP.
+    const lineTotalCop = (numerator + 500n) / 1_000n;
+    if (lineTotalCop > MAX_SQLITE_INTEGER) {
+      throw new DomainValidationError("El subtotal de una línea excede el máximo permitido por SQLite.");
+    }
+    totalCop += lineTotalCop;
+    if (totalCop > MAX_SQLITE_INTEGER) {
+      throw new DomainValidationError("El total de la venta excede el máximo permitido por SQLite.");
+    }
+    return lineTotalCop;
+  });
+
+  return { lineTotalsCop, totalCop };
+}
+
+export function addSaleQuantity(current: string, increment = "1"): string {
+  const next = parseQuantityMilli(current) + parseQuantityMilli(increment);
+  if (next > MAX_SQLITE_INTEGER) {
+    throw new DomainValidationError("La cantidad excede el máximo permitido por SQLite.");
+  }
+  return formatQuantityMilli(next);
+}
+
+export function validateSaleStock(quantity: string, available: string, productName: string): void {
+  const requestedMilli = parseQuantityMilli(quantity);
+  const availableMilli = parseQuantityMilli(available);
+  if (requestedMilli === 0n) {
+    throw new DomainValidationError("La cantidad de cada producto debe ser mayor que cero.");
+  }
+  if (requestedMilli > availableMilli) {
+    throw new DomainValidationError(`Existencia insuficiente para ${productName}.`);
+  }
+}
+
+export function combineSaleQuantities(
+  lines: Array<{ productId: string; quantity: string }>
+): Array<{ productId: string; quantityMilli: bigint }> {
+  if (lines.length === 0 || lines.length > 100) {
+    throw new DomainValidationError("La venta debe incluir entre 1 y 100 productos.");
+  }
+
+  const quantities = new Map<string, bigint>();
+  for (const line of lines) {
+    if (!line.productId.trim()) {
+      throw new DomainValidationError("Falta el producto de una línea de venta.");
+    }
+    const quantity = parseQuantityMilli(line.quantity);
+    if (quantity === 0n) {
+      throw new DomainValidationError("La cantidad de cada producto debe ser mayor que cero.");
+    }
+    const combined = (quantities.get(line.productId) ?? 0n) + quantity;
+    if (combined > MAX_SQLITE_INTEGER) {
+      throw new DomainValidationError("La cantidad excede el máximo permitido por SQLite.");
+    }
+    quantities.set(line.productId, combined);
+  }
+
+  return Array.from(quantities, ([productId, quantityMilli]) => ({ productId, quantityMilli }));
+}
+
+export function normalizeSalePayment(
+  input: SalePaymentDraft,
+  totalCop: bigint
+): NormalizedSalePayment {
+  if (!PAYMENT_METHOD_IDS.some((method) => method === input.method)) {
+    throw new DomainValidationError("El método de pago seleccionado no es válido.");
+  }
+  if (totalCop < 0n || totalCop > MAX_SQLITE_INTEGER) {
+    throw new DomainValidationError("El total de la venta no es válido.");
+  }
+
+  const method = input.method as PaymentMethodId;
+  const amountPaidCop = parseCopInteger(input.amountPaidCop);
+  if (method === "cash") {
+    if (amountPaidCop < totalCop) {
+      throw new DomainValidationError("El efectivo recibido no alcanza a cubrir el total.");
+    }
+  } else if (amountPaidCop !== totalCop) {
+    throw new DomainValidationError("El valor pagado debe ser igual al total para este método.");
+  }
+
+  const transferMethod = method === "bank_transfer" || method === "nequi" || method === "daviplata" || method === "bre_b";
+  const cardMethod = method === "debit_card" || method === "credit_card";
+  const reference = normalizeOptionalReference(input.reference, "La referencia");
+  const authorizationCode = normalizeOptionalReference(input.authorizationCode, "El código de autorización", 64);
+
+  if (reference && !transferMethod) {
+    throw new DomainValidationError("La referencia solo aplica a transferencias, Nequi, DaviPlata o Bre-B.");
+  }
+  if (authorizationCode && !cardMethod) {
+    throw new DomainValidationError("El código de autorización solo aplica a pagos con tarjeta.");
+  }
+  if (authorizationCode && /^\d{3,4}$/.test(authorizationCode)) {
+    throw new DomainValidationError("No ingreses CVV ni PIN como código de autorización.");
+  }
+
+  return {
+    method,
+    amountPaidCop,
+    changeCop: method === "cash" ? amountPaidCop - totalCop : 0n,
+    reference,
+    authorizationCode
+  };
+}
+
+function normalizeOptionalReference(value: string | undefined, label: string, maxLength = 120): string | null {
+  const normalized = value?.trim() ?? "";
+  if (!normalized) return null;
+  if (normalized.length > maxLength) {
+    throw new DomainValidationError(`${label} no puede superar ${maxLength} caracteres.`);
+  }
+  if (/\d{13,19}/.test(normalized.replace(/[\s-]/g, ""))) {
+    throw new DomainValidationError(`${label} no puede contener un número de tarjeta.`);
+  }
+  return normalized;
+}
