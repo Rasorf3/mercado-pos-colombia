@@ -24,6 +24,7 @@ function createWindow(): void {
     height: 760,
     minWidth: 860,
     minHeight: 560,
+    show: false,
     backgroundColor: "#f6f7fb",
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
@@ -34,6 +35,10 @@ function createWindow(): void {
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event) => event.preventDefault());
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.maximize();
+    mainWindow?.show();
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
