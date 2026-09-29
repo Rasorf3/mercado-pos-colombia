@@ -42,6 +42,10 @@ test("bootstrap, login y permisos guardan hashes y revocan usuarios desactivados
   assert.throws(() => auth.requireCapability(4, "inventory:manage"), /No tienes permiso/i);
   await auth.login({ username: "jefe1", password: "Clave del jefe 2026!" }, 6);
   assert.equal(auth.requireCapability(6, "inventory:manage").id, manager.id);
+  assert.equal(auth.requireCapability(6, "sales:create").id, manager.id);
+  assert.equal(auth.requireCapability(6, "catalog:sale-read").id, manager.id);
+  assert.equal(auth.requireCapability(6, "clients:lookup-for-sale").id, manager.id);
+  assert.throws(() => auth.requireCapability(6, "users:manage"), /No tienes permiso/i);
   await assert.rejects(auth.login({ username: "cajero1", password: "incorrecta" }, 5), /Usuario o contraseña/i);
 
   const catalog = new CatalogService(database);
@@ -64,6 +68,11 @@ test("bootstrap, login y permisos guardan hashes y revocan usuarios desactivados
   const sales = new SalesService(database);
   assert.equal(sale.createdByUsername, employee.username);
   assert.equal(sales.listSales({ page: 1, pageSize: 10 }).sales[0].createdByUsername, employee.username);
+  const managerSale = sales.createSale({
+    items: [{ productId: product.id, quantity: "1" }],
+    payment: { method: "cash", amountPaidCop: "1000" }
+  }, auth.requireCapability(6, "sales:create").id);
+  assert.equal(managerSale.createdByUsername, manager.username);
   assert.equal(database.prepare("SELECT created_by_user_id FROM clients WHERE id = ?").get(client.id).created_by_user_id, employee.id);
   assert.equal(database.prepare("SELECT created_by_user_id FROM sales WHERE id = ?").get(sale.id).created_by_user_id, employee.id);
   assert.equal(database.prepare("SELECT created_by_user_id FROM inventory_movements WHERE sale_id = ?").get(sale.id).created_by_user_id, employee.id);

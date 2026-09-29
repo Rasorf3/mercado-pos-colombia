@@ -15,12 +15,12 @@ Estado: primera implementación local. La API y la sincronización no usan esta 
 | Capacidad | AdminMaster | Admin | EmpleadoJefe | Empleado |
 |---|---:|---:|---:|---:|
 | Catálogo y costos | Todo | Todo | Consultar y administrar | No |
-| Consulta acotada de productos para vender | Todo | Sí | No | Sí; no recibe el costo |
+| Consulta acotada de productos para vender | Todo | Sí | Sí; no recibe el costo en esta consulta | Sí; no recibe el costo |
 | Existencias y movimientos | Todo | Consultar y administrar | Consultar y administrar | No |
-| Registrar ventas | Todo | Sí | No | Sí |
+| Registrar ventas | Todo | Sí | Sí | Sí |
 | Consultar historial y ventas ajenas | Todo | Sí | Sí | No |
 | Consultar directorio de clientes | Todo | Sí | Sí | No |
-| Buscar un comprador activo desde el flujo de venta | Todo | Sí | No | Sí; búsqueda limitada |
+| Buscar un comprador activo desde el flujo de venta | Todo | Sí | Sí; búsqueda limitada | Sí; búsqueda limitada |
 | Crear cliente desde la venta/directorio | Todo | Sí | Sí | Sí |
 | Editar/desactivar clientes | Todo | Sí | Sí | No |
 | Administrar cuentas | Todo | Sí | No | No |
@@ -30,7 +30,7 @@ La interfaz oculta secciones según el rol, pero esa ocultación no es la barrer
 
 Admin puede crear cuentas **Admin**, **EmpleadoJefe** y **Empleado**. El rol **AdminMaster** no aparece entre las opciones y es rechazado también por el contrato y el servicio principal.
 
-El empleado puede consultar productos mediante un resultado específico de venta que excluye el costo. Para escoger un comprador usa una búsqueda acotada a clientes activos y al perfil mínimo para asociarlo; no obtiene el directorio completo ni puede editar o desactivar clientes. Al crear una venta, el proceso principal vuelve a validar los datos y conserva la instantánea habitual del comprador.
+Empleado y EmpleadoJefe pueden acceder al flujo de venta y consultar productos mediante un resultado específico de venta que excluye el costo en esa consulta. Para escoger un comprador usan una búsqueda acotada a clientes activos y al perfil mínimo para asociarlo; no obtienen el directorio completo desde ese flujo. Al crear una venta, el proceso principal vuelve a validar los datos y conserva la instantánea habitual del comprador. EmpleadoJefe mantiene además sus permisos independientes de inventario, clientes e historial, pero no puede administrar cuentas.
 
 “Quitar” productos y clientes significa desactivarlos, no borrarlos: ventas y movimientos históricos deben seguir referenciándolos.
 

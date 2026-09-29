@@ -26,8 +26,8 @@ const ADMIN_CAPABILITIES: readonly Capability[] = [
 const ROLE_CAPABILITIES: Record<Exclude<UserRole, "admin_master">, readonly Capability[]> = {
   admin: ADMIN_CAPABILITIES,
   employee_manager: [
-    "catalog:read", "catalog:manage", "inventory:read", "inventory:manage",
-    "sales:history", "clients:read", "clients:create", "clients:manage",
+    "catalog:read", "catalog:sale-read", "catalog:manage", "inventory:read", "inventory:manage",
+    "sales:create", "sales:history", "clients:read", "clients:lookup-for-sale", "clients:create", "clients:manage",
     "cash:close", "suppliers:manage"
   ],
   employee: [

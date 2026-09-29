@@ -5,7 +5,10 @@ import { roleCan } from "../dist/access.js";
 test("roles only receive their explicitly assigned capabilities", () => {
   assert.equal(roleCan("admin", "users:manage"), true);
   assert.equal(roleCan("employee_manager", "inventory:manage"), true);
-  assert.equal(roleCan("employee_manager", "sales:create"), false);
+  assert.equal(roleCan("employee_manager", "catalog:sale-read"), true);
+  assert.equal(roleCan("employee_manager", "sales:create"), true);
+  assert.equal(roleCan("employee_manager", "sales:history"), true);
+  assert.equal(roleCan("employee_manager", "clients:lookup-for-sale"), true);
   assert.equal(roleCan("employee_manager", "clients:manage"), true);
   assert.equal(roleCan("employee_manager", "users:manage"), false);
   assert.equal(roleCan("employee", "sales:create"), true);
