@@ -15,6 +15,7 @@ import type {
   Product,
   ProductCreateInput,
   ProductSearchInput,
+  SaleProduct,
   ProductUpdateInput
 } from "@mercado-pos/contracts";
 
@@ -92,7 +93,14 @@ export class CatalogService {
     return rows.map(toProduct);
   }
 
-  createProduct(input: ProductCreateInput): Product {
+  listProductsForSale(query: string): SaleProduct[] {
+    return this.listProducts({ query: query.trim(), includeInactive: false })
+      .map(({ id, name, internalCode, barcode, salePriceCop, unit, active, stock }) => ({
+        id, name, internalCode, barcode, salePriceCop, unit, active, stock
+      }));
+  }
+
+  createProduct(input: ProductCreateInput, actorUserId: string | null = null): Product {
     const draft = normalizeProductDraft(input);
     const initialStock = parseQuantityMilli(input.initialStock);
     const id = randomUUID();
@@ -102,8 +110,9 @@ export class CatalogService {
       this.database.prepare(`
         INSERT INTO products (
           id, name, internal_code, barcode, cost_cop, sale_price_cop,
-          unit, active, stock_milli, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+          unit, active, stock_milli, created_at, updated_at,
+          created_by_user_id, updated_by_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
       `).run(
         id,
         draft.name,
@@ -114,15 +123,17 @@ export class CatalogService {
         draft.unit,
         initialStock,
         now,
-        now
+        now,
+        actorUserId,
+        actorUserId
       );
 
       this.database.prepare(`
         INSERT INTO inventory_movements (
           id, product_id, type, quantity_milli, stock_before_milli,
-          stock_after_milli, note, created_at
-        ) VALUES (?, ?, 'initial', ?, 0, ?, ?, ?)
-      `).run(randomUUID(), id, initialStock, initialStock, "Existencia inicial", now);
+          stock_after_milli, note, created_at, created_by_user_id
+        ) VALUES (?, ?, 'initial', ?, 0, ?, ?, ?, ?)
+      `).run(randomUUID(), id, initialStock, initialStock, "Existencia inicial", now, actorUserId);
 
       return this.getProduct(id);
     });
@@ -134,13 +145,13 @@ export class CatalogService {
     }
   }
 
-  updateProduct(id: string, input: ProductUpdateInput): Product {
+  updateProduct(id: string, input: ProductUpdateInput, actorUserId: string | null = null): Product {
     const draft = normalizeProductDraft(input);
     const updated = this.database.transaction(() => {
       const result = this.database.prepare(`
         UPDATE products
         SET name = ?, internal_code = ?, barcode = ?, cost_cop = ?,
-            sale_price_cop = ?, unit = ?, active = ?, updated_at = ?
+            sale_price_cop = ?, unit = ?, active = ?, updated_at = ?, updated_by_user_id = ?
         WHERE id = ?
       `).run(
         draft.name,
@@ -151,6 +162,7 @@ export class CatalogService {
         draft.unit,
         input.active ? 1n : 0n,
         new Date().toISOString(),
+        actorUserId,
         id
       );
 
@@ -168,20 +180,20 @@ export class CatalogService {
     }
   }
 
-  recordEntry(input: InventoryEntryInput): InventoryMovement {
+  recordEntry(input: InventoryEntryInput, actorUserId: string | null = null): InventoryMovement {
     const quantity = parseQuantityMilli(input.quantity);
     if (quantity === 0n) {
       throw new Error("La entrada debe ser mayor que cero.");
     }
-    return this.recordMovement(input.productId, "entry", quantity, input.note);
+    return this.recordMovement(input.productId, "entry", quantity, input.note, actorUserId);
   }
 
-  recordAdjustment(input: InventoryAdjustmentInput): InventoryMovement {
+  recordAdjustment(input: InventoryAdjustmentInput, actorUserId: string | null = null): InventoryMovement {
     const delta = parseQuantityDeltaMilli(input.delta);
     if (delta === 0n) {
       throw new Error("El ajuste debe ser diferente de cero.");
     }
-    return this.recordMovement(input.productId, "adjustment", delta, input.note);
+    return this.recordMovement(input.productId, "adjustment", delta, input.note, actorUserId);
   }
 
   listMovements(productId: string): InventoryMovement[] {
@@ -202,7 +214,8 @@ export class CatalogService {
     productId: string,
     type: "entry" | "adjustment",
     delta: bigint,
-    note: string
+    note: string,
+    actorUserId: string | null
   ): InventoryMovement {
     const reason = validateMovementNote(note);
     const record = this.database.transaction(() => {
@@ -220,15 +233,15 @@ export class CatalogService {
       const id = randomUUID();
 
       this.database.prepare(`
-        UPDATE products SET stock_milli = ?, updated_at = ? WHERE id = ?
-      `).run(after, createdAt, productId);
+        UPDATE products SET stock_milli = ?, updated_at = ?, updated_by_user_id = ? WHERE id = ?
+      `).run(after, createdAt, actorUserId, productId);
 
       this.database.prepare(`
         INSERT INTO inventory_movements (
           id, product_id, type, quantity_milli, stock_before_milli,
-          stock_after_milli, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, productId, type, delta, before, after, reason, createdAt);
+          stock_after_milli, note, created_at, created_by_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, productId, type, delta, before, after, reason, createdAt, actorUserId);
 
       return {
         id,

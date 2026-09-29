@@ -44,6 +44,9 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - Los perfiles locales guardan nombre/razón social, tipo y número de identificación y correo opcional; no se recopilan dirección o teléfono. Una venta puede no tener comprador y congela los datos del cliente seleccionado en una instantánea inmutable.
 - Los métodos se persisten con IDs estables (`cash`, `debit_card`, `credit_card`, `bank_transfer`, `nequi`, `daviplata`, `bre_b`); la UI presenta etiquetas en español.
 - Un código de barras no puede repetirse. El código interno no es único en este alcance; solo se exige unicidad al código de barras.
+- El acceso al POS exige sesión local. Auth, contratos y permisos atraviesan React → preload → IPC → proceso principal; contraseñas se derivan con `scrypt` y permisos se vuelven a validar en cada operación protegida.
+- La migración v4 crea cuentas/roles y atribuye nuevas ventas, movimientos, altas y ediciones a un usuario. Datos antiguos conservan el actor como `NULL`; no se modifican sus importes, comprador ni existencias.
+- AdminMaster no se asigna ni aprovisiona desde la interfaz. Su identidad está reservada, sin contraseña compartida ni puerta trasera distribuida.
 
 ## Historial y comprobantes locales
 
@@ -54,6 +57,8 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - Electron abre el diálogo de impresión (`silent: false`) y el de ubicación del PDF. El formato de 58/80 mm, margen y largo por página se validan; son preferencias locales del renderer, independientes de SQLite. El controlador físico puede imponer límites distintos. Solo un comprobante puede estar en proceso a la vez.
 
 Ver [`local-sales-history-and-receipts.md`](local-sales-history-and-receipts.md) para uso, pruebas y límites físicos. La integración DIAN sigue pendiente de configuración fiscal confirmada.
+
+La matriz y los límites de autenticación se describen en [`users-and-roles.md`](users-and-roles.md).
 
 ## Evolución prevista
 

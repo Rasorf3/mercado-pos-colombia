@@ -14,9 +14,13 @@ Ya existen:
 - Clientes locales: crear, editar, buscar y desactivar perfiles; ventas pueden omitir comprador o guardar una instantánea inmutable del cliente elegido dentro de la transacción de venta. Solo se guardan nombre, tipo/número de identificación y correo opcional.
 - Historial local paginado y filtrado por días de Colombia (UTC−5), con detalle de las instantáneas guardadas. Reutiliza las tablas e índice existentes, sin migración nueva.
 - Comprobante local de 58/80 mm con impresión mediante diálogo y PDF mediante selección de ubicación, accesibles al cerrar la venta y desde su detalle. Los márgenes/largo por página son configurables; no hay recursos de internet ni efectos sobre ventas o inventario al reimprimir.
+- Acceso local con alta única del primer Admin, hash de contraseñas `scrypt`, cierre de sesión, administración de usuarios y permisos verificados en handlers IPC. Empleado solo ve el flujo de ventas, puede crear clientes y recibe una proyección de productos sin costo. Las cuentas solo se guardan localmente.
+- Migración SQLite v4: cuentas/roles y atribución del actor en operaciones nuevas de venta, inventario, productos y clientes. Históricos se mantienen con actor nulo.
 - Pruebas de dominio, contratos, persistencia SQLite, migraciones y reversión completa de una venta ante error.
 
 La verificación del 2026-09-28 pasó `npm test` (27 pruebas), `npm run typecheck`, `npm run build`, `git diff --check` y el inicio de `npm run dev:pos` con una ventana visible. Se generaron y revisaron visualmente PDFs reales de 58/80 mm, incluidos 40 productos con nombres largos; también se probó navegación y PDF desde cierre/detalle con perfil aislado y red bloqueada. No se probó una impresora física ni la interacción manual con los diálogos del controlador: cancelaciones y selección de ruta se simularon. Solo se detectaron impresoras virtuales. La compilación y las pruebas pueden mostrar avisos no bloqueantes `MODULE_TYPELESS_PACKAGE_JSON` relacionados con la detección de módulos. Repite las verificaciones después de modificar el código; el árbol de trabajo puede haber cambiado desde esa ejecución.
+
+El 2026-09-29, tras añadir autenticación local y roles, pasaron `npm test` (31 pruebas), `npm run typecheck`, `npm run build` y `git diff --check`. Un smoke test de Electron aisló `userData` en una carpeta temporal y comprobó configuración del primer Admin, alta de Empleado, logout/login, navegación limitada y rechazo de IPC para historial/directorios; también comprobó la búsqueda de producto de venta sin costo y alta de cliente. La prueba usó solo datos ficticios y no probó impresora física. El comando de desarrollo se abrió durante la verificación; se cerró antes de repetir la compilación para evitar que Forge compartiera `.webpack` entre ambos procesos.
 
 ## Mapa del código
 
@@ -44,6 +48,9 @@ La verificación del 2026-09-28 pasó `npm test` (27 pruebas), `npm run typechec
 - Los IDs persistidos para métodos de pago son `cash`, `debit_card`, `credit_card`, `bank_transfer`, `nequi`, `daviplata` y `bre_b`. La interfaz usa etiquetas en español.
 - Solo se registra el medio declarado; no se procesan tarjetas ni se verifican transferencias. No guardar números de tarjeta, CVV, claves, PIN ni credenciales bancarias. Referencias y códigos de autorización son opcionales y no prueban el pago.
 - Mantener `contextIsolation` habilitado, `nodeIntegration` deshabilitado y exponer solo capacidades explícitas por preload.
+- La sesión identifica al usuario autenticado por `webContents.id`; cada operación protegida vuelve a consultar que la cuenta esté activa y comprueba su capacidad en main. No confíes solo en botones/secciones ocultos en React.
+- Roles estables: `admin_master`, `admin`, `employee_manager`, `employee`. AdminMaster no se asigna desde UI ni existe una credencial de desarrollador integrada. El selector Admin crea solo Admin o Empleado; aprovisionamiento EmpleadoJefe aún requiere decisión.
+- Contraseñas: sal aleatoria y hash scrypt, mínimo 12 caracteres; no registrar contraseñas ni hashes en renderer o logs. La SQLite no está cifrada; la cuenta del sistema operativo sigue siendo parte de la frontera de seguridad.
 - No añadir secretos, certificados reales, bases SQLite de usuario ni datos reales al repositorio. No hacer llamadas productivas a DIAN.
 
 ## Comandos desde la raíz
@@ -62,6 +69,6 @@ npm run verify
 
 ## Trabajo pendiente y límites de alcance
 
-No están implementados: emisión electrónica o integración DIAN, sincronización/idempotencia con PostgreSQL, autenticación y aislamiento multi-comercio en la API, proveedores, suscripciones ni procesamiento/conciliación de pagos. La impresión local/PDF sí existe; calibración física, corte de papel y cajón quedan pendientes. Antes de trabajar requisitos tributarios, consulta fuentes oficiales vigentes y registra fuente, versión y fecha en `docs/dian/`. La integración DIAN sigue pendiente de configuración fiscal confirmada. Mantén cualquier integración externa aislada y empieza en ambiente de pruebas.
+No están implementados: emisión electrónica o integración DIAN, sincronización/idempotencia con PostgreSQL, autenticación y aislamiento multi-comercio en la API, proveedores, cierres de caja, suscripciones ni procesamiento/conciliación de pagos. La administración local de usuarios no autentica la API. Faltan recuperación/cambio de contraseñas, bloqueo por inactividad, aprovisionamiento seguro de AdminMaster y alta de EmpleadoJefe. La impresión local/PDF sí existe; calibración física, corte de papel y cajón quedan pendientes. Antes de trabajar requisitos tributarios, consulta fuentes oficiales vigentes y registra fuente, versión y fecha en `docs/dian/`. La integración DIAN sigue pendiente de configuración fiscal confirmada. Mantén cualquier integración externa aislada y empieza en ambiente de pruebas.
 
 Antes de editar, revisa `git status` y los cambios locales para preservar trabajo previo; no presupongas que el checkout está limpio. No hagas commit, push, cambios de dependencias de seguridad ni amplíes el alcance sin autorización explícita.

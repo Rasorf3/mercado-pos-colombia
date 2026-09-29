@@ -2,8 +2,10 @@ import { contextBridge, ipcRenderer } from "electron";
 import { CATALOG_CHANNELS, type CatalogBridge } from "./catalogBridge";
 import { CLIENTS_CHANNELS, type ClientsBridge } from "./clientsBridge";
 import { SALES_CHANNELS, type SalesBridge } from "./salesBridge";
+import { AUTH_CHANNELS, type AuthBridge } from "./authBridge";
 
 const catalog: CatalogBridge = {
+  searchProductsForSale: (query) => ipcRenderer.invoke(CATALOG_CHANNELS.searchProductsForSale, query),
   listProducts: (input) => ipcRenderer.invoke(CATALOG_CHANNELS.listProducts, input),
   createProduct: (input) => ipcRenderer.invoke(CATALOG_CHANNELS.createProduct, input),
   updateProduct: (id, input) => ipcRenderer.invoke(CATALOG_CHANNELS.updateProduct, id, input),
@@ -22,9 +24,20 @@ const sales: SalesBridge = {
 };
 
 const clients: ClientsBridge = {
+  searchForSale: (query) => ipcRenderer.invoke(CLIENTS_CHANNELS.searchForSale, query),
   list: (input) => ipcRenderer.invoke(CLIENTS_CHANNELS.list, input),
   create: (input) => ipcRenderer.invoke(CLIENTS_CHANNELS.create, input),
   update: (id, input) => ipcRenderer.invoke(CLIENTS_CHANNELS.update, id, input)
 };
 
-contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, catalog, sales, clients });
+const auth: AuthBridge = {
+  state: () => ipcRenderer.invoke(AUTH_CHANNELS.state),
+  bootstrapAdmin: (input) => ipcRenderer.invoke(AUTH_CHANNELS.bootstrapAdmin, input),
+  login: (input) => ipcRenderer.invoke(AUTH_CHANNELS.login, input),
+  logout: () => ipcRenderer.invoke(AUTH_CHANNELS.logout),
+  listUsers: () => ipcRenderer.invoke(AUTH_CHANNELS.listUsers),
+  createUser: (input) => ipcRenderer.invoke(AUTH_CHANNELS.createUser, input),
+  setUserActive: (id, active) => ipcRenderer.invoke(AUTH_CHANNELS.setUserActive, id, { active })
+};
+
+contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, auth, catalog, sales, clients });

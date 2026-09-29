@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
-import type { Client, PaymentMethod, Product, Sale, SaleCreateInput, SaleSummary } from "@mercado-pos/contracts";
+import type { ClientCreateInput, PaymentMethod, SaleClientMatch, SaleProduct, Sale, SaleCreateInput, SaleSummary } from "@mercado-pos/contracts";
 import { PAYMENT_METHOD_OPTIONS } from "@mercado-pos/contracts";
 import { ReceiptActions } from "./ReceiptActions";
 import { SaleDetail } from "./SaleDetail";
+import { QuickClientCreateForm } from "./QuickClientCreateForm";
 import {
   addSaleQuantity,
   calculateSaleAmounts,
@@ -13,15 +14,16 @@ import {
 
 interface Props {
   onBackToCatalog: () => void;
+  showSalesHistory?: boolean;
 }
 
 interface CartLine {
-  product: Product;
+  product: SaleProduct;
   quantity: string;
 }
 
-export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
-  const [products, setProducts] = useState<Product[]>([]);
+export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props): ReactElement {
+  const [products, setProducts] = useState<SaleProduct[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [query, setQuery] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -29,8 +31,9 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
   const [reference, setReference] = useState("");
   const [authorizationCode, setAuthorizationCode] = useState("");
   const [buyerSearch, setBuyerSearch] = useState("");
-  const [buyerMatches, setBuyerMatches] = useState<Client[]>([]);
-  const [selectedBuyer, setSelectedBuyer] = useState<Client | null>(null);
+  const [buyerMatches, setBuyerMatches] = useState<SaleClientMatch[]>([]);
+  const [selectedBuyer, setSelectedBuyer] = useState<SaleClientMatch | null>(null);
+  const [creatingBuyer, setCreatingBuyer] = useState(false);
   const [recentSales, setRecentSales] = useState<SaleSummary[]>([]);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [detailSale, setDetailSale] = useState<Sale | null>(null);
@@ -92,7 +95,7 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
   const loadProducts = useCallback(async (search: string) => {
     const requestId = ++searchRequestRef.current;
     try {
-      const result = await window.electronAPI.catalog.listProducts({ query: search, includeInactive: false });
+      const result = await window.electronAPI.catalog.searchProductsForSale(search);
       if (searchRequestRef.current === requestId) setProducts(result);
     } catch (error) {
       setMessage(errorMessage(error));
@@ -112,7 +115,7 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
       return;
     }
     const timer = window.setTimeout(() => {
-      void window.electronAPI.clients.list({ query: search, includeInactive: false })
+      void window.electronAPI.clients.searchForSale(search)
         .then((matches) => {
           if (buyerRequestRef.current === requestId) setBuyerMatches(matches);
         })
@@ -122,12 +125,13 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
   }, [buyerSearch]);
 
   useEffect(() => {
+    if (!showSalesHistory) return;
     void window.electronAPI.sales.listRecentSales()
       .then(setRecentSales)
       .catch((error: unknown) => setMessage(errorMessage(error)));
-  }, []);
+  }, [showSalesHistory]);
 
-  const addProduct = (product: Product) => {
+  const addProduct = (product: SaleProduct) => {
     setMessage("");
     setCompletedSale(null);
     try {
@@ -147,7 +151,7 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
     searchRequestRef.current += 1;
     setMessage("");
     try {
-      const result = await window.electronAPI.catalog.listProducts({ query: scannedCode, includeInactive: false });
+      const result = await window.electronAPI.catalog.searchProductsForSale(scannedCode);
       setProducts(result);
       const exactMatch = result.find((product) => product.active && product.barcode === scannedCode);
       if (exactMatch) {
@@ -193,8 +197,8 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
       setReference("");
       setAuthorizationCode("");
       setQuery("");
-      setProducts(await window.electronAPI.catalog.listProducts({ query: "", includeInactive: false }));
-      setRecentSales(await window.electronAPI.sales.listRecentSales());
+      setProducts(await window.electronAPI.catalog.searchProductsForSale(""));
+      if (showSalesHistory) setRecentSales(await window.electronAPI.sales.listRecentSales());
       setMessage("Venta guardada localmente; no se emitió factura electrónica.");
       searchRef.current?.focus();
     } catch (error) {
@@ -214,13 +218,34 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
     catch (error) { setMessage(errorMessage(error)); }
   };
 
+  const createBuyer = async (input: ClientCreateInput): Promise<boolean> => {
+    try {
+      const created = await window.electronAPI.clients.create(input);
+      const match: SaleClientMatch = {
+        id: created.id,
+        name: created.name,
+        documentType: created.documentType,
+        documentNumber: created.documentNumber,
+        email: created.email
+      };
+      setSelectedBuyer(match);
+      setBuyerSearch("");
+      setBuyerMatches([]);
+      setMessage("Cliente creado y asociado a la venta.");
+      return true;
+    } catch (error) {
+      setMessage(errorMessage(error));
+      return false;
+    }
+  };
+
   if (detailSale) return <SaleDetail sale={detailSale} onClose={() => setDetailSale(null)} />;
 
   return (
     <section className="sales-page" aria-labelledby="sale-title">
       <div className="page-heading sales-heading">
         <div><p className="eyebrow">Caja · operación local</p><h1 id="sale-title">Nueva venta</h1><p className="subheading">Registra productos, existencias y un único medio de pago.</p></div>
-        <button className="quiet-button" onClick={onBackToCatalog}>← Volver al catálogo</button>
+        {showSalesHistory && <button className="quiet-button" onClick={onBackToCatalog}>← Volver al catálogo</button>}
       </div>
 
       <div className="invoice-pending-banner" role="note">
@@ -272,12 +297,13 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
               <div><strong>{selectedBuyer.name}</strong><small>{formatClientIdentity(selectedBuyer) || selectedBuyer.email || "Sin identificación ni correo"}</small></div>
               <button type="button" className="quiet-small" onClick={() => setSelectedBuyer(null)}>Quitar</button>
             </div> : <>
-              <input className="buyer-search-input" type="search" maxLength={120} value={buyerSearch} placeholder="Busca nombre, identificación o correo" aria-label="Buscar cliente para asociar a la venta" onChange={(event) => setBuyerSearch(event.target.value)} />
+              {!creatingBuyer && <input className="buyer-search-input" type="search" maxLength={120} value={buyerSearch} placeholder="Busca nombre, identificación o correo" aria-label="Buscar cliente para asociar a la venta" onChange={(event) => setBuyerSearch(event.target.value)} />}
               {buyerSearch.trim() && <div className="buyer-match-list">
                 {buyerMatches.length === 0 ? <p>{"Sin clientes activos coincidentes."}</p> : buyerMatches.map((client) => <button type="button" key={client.id} onClick={() => { setSelectedBuyer(client); setBuyerSearch(""); setBuyerMatches([]); }}>
                   <strong>{client.name}</strong><small>{formatClientIdentity(client) || client.email || "Sin identificación ni correo"}</small>
                 </button>)}
               </div>}
+              {creatingBuyer ? <QuickClientCreateForm onCancel={() => setCreatingBuyer(false)} onSave={createBuyer} /> : <button type="button" className="text-button quick-client-trigger" onClick={() => { setBuyerSearch(""); setBuyerMatches([]); setCreatingBuyer(true); }}>＋ Crear cliente y asociar</button>}
             </>}
             <small>También puedes registrar la venta sin perfil de comprador.</small>
           </div>
@@ -295,7 +321,7 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
         </form>
       </div>
 
-      <section className="recent-sales-panel">
+      {showSalesHistory && <section className="recent-sales-panel">
         <div className="sale-panel-title"><div><p className="eyebrow">Historial en este equipo</p><h2>Ventas locales recientes</h2></div><span className="count-chip">{recentSales.length}</span></div>
         {recentSales.length === 0 ? <p className="sale-search-empty">Todavía no hay ventas locales.</p> : <div className="recent-sales-list">{recentSales.map((sale) => (
           <article className="recent-sale-row" key={sale.id}>
@@ -306,7 +332,7 @@ export function SalesScreen({ onBackToCatalog }: Props): ReactElement {
             <button className="text-button" type="button" onClick={() => void openDetail(sale.id)}>Ver detalle</button>
           </article>
         ))}</div>}
-      </section>
+      </section>}
       {message && <div className="toast" role="status"><span>{message}</span><button aria-label="Cerrar mensaje" onClick={() => setMessage("")}>×</button></div>}
     </section>
   );
@@ -332,13 +358,13 @@ function methodLabel(method: PaymentMethod): string {
   return PAYMENT_METHOD_OPTIONS.find((option) => option.id === method)?.label ?? method;
 }
 
-function formatClientIdentity(client: Client): string {
+function formatClientIdentity(client: SaleClientMatch): string {
   return client.documentType && client.documentNumber
     ? `${client.documentType} · ${client.documentNumber}`
     : "";
 }
 
-function shortUnit(unit: Product["unit"]): string {
+function shortUnit(unit: SaleProduct["unit"]): string {
   return ({ unit: "und.", kg: "kg", g: "g", l: "L", ml: "ml", m: "m" })[unit];
 }
 

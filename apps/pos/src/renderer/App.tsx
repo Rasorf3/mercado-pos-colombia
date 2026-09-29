@@ -7,32 +7,40 @@ import {
   type ReactElement
 } from "react";
 import type {
+  AuthState,
   InventoryAdjustmentInput,
   InventoryEntryInput,
   InventoryMovement,
   Product,
   ProductCreateInput,
   ProductSearchInput,
-  ProductUpdateInput
+  ProductUpdateInput,
+  UserRole
 } from "@mercado-pos/contracts";
+import { roleCan } from "@mercado-pos/domain";
 import { ProductForm } from "./ProductForm";
 import { ProductInspector } from "./ProductInspector";
 import { SalesScreen } from "./SalesScreen";
 import { ClientsScreen } from "./ClientsScreen";
 import { SalesHistoryScreen } from "./SalesHistoryScreen";
+import { UsersScreen } from "./UsersScreen";
+import { LoginScreen } from "./LoginScreen";
 import "./salesHistory.css";
 
 const FONT_SIZE_STEPS = [100, 110, 120, 130, 140, 150] as const;
 const FONT_SIZE_STORAGE_KEY = "mercado-pos-font-size";
+type Page = "catalog" | "sales" | "clients" | "history" | "users";
 
 export function App(): ReactElement {
+  const [authState, setAuthState] = useState<AuthState | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [search, setSearch] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [editing, setEditing] = useState<Product | null | undefined>(undefined);
-  const [activePage, setActivePage] = useState<"catalog" | "sales" | "clients" | "history">("catalog");
+  const [activePage, setActivePage] = useState<Page>("catalog");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [fontScale, setFontScale] = useState(readFontScale);
@@ -49,6 +57,16 @@ export function App(): ReactElement {
       // La preferencia se aplica durante esta sesión aunque el almacenamiento no esté disponible.
     }
   }, [fontScale]);
+
+  useEffect(() => {
+    void window.electronAPI.auth.state()
+      .then((state) => {
+        setAuthState(state);
+        if (state.user) setActivePage(defaultPage(state.user.role));
+      })
+      .catch((error: unknown) => setMessage(errorMessage(error)))
+      .finally(() => setAuthLoading(false));
+  }, []);
 
   const loadProducts = useCallback(async (input: ProductSearchInput) => {
     const requestId = ++requestRef.current;
@@ -68,12 +86,13 @@ export function App(): ReactElement {
   }, [selectedId]);
 
   useEffect(() => {
+    if (!authState?.user || !roleCan(authState.user.role, "catalog:read")) return;
     if (activePage !== "catalog") return;
     const timer = window.setTimeout(() => {
       void loadProducts({ query: search, includeInactive });
     }, 100);
     return () => window.clearTimeout(timer);
-  }, [activePage, includeInactive, loadProducts, search]);
+  }, [activePage, authState?.user, includeInactive, loadProducts, search]);
 
   const selectProduct = async (product: Product) => {
     const requestId = ++movementRequestRef.current;
@@ -195,6 +214,23 @@ export function App(): ReactElement {
     setMovements(nextMovements);
   };
 
+  const availablePages = authState?.user ? pagesForRole(authState.user.role) : [];
+  const handleAuthenticated = (state: AuthState) => {
+    setAuthState(state);
+    if (state.user) setActivePage(defaultPage(state.user.role));
+  };
+  const logout = async () => {
+    await window.electronAPI.auth.logout();
+    setAuthState({ needsBootstrap: false, user: null });
+    setEditing(undefined);
+    setProducts([]);
+  };
+
+  if (authLoading) return <main className="auth-screen"><p role="status">Cargando acceso seguro…</p></main>;
+  if (!authState || authState.needsBootstrap || !authState.user) {
+    return <LoginScreen needsBootstrap={authState?.needsBootstrap ?? false} onAuthenticated={handleAuthenticated} fontScale={fontScale / 100} />;
+  }
+
   return (
     <main className="app-shell" style={{ "--font-scale": fontScale / 100 } as CSSProperties}>
       <header className="topbar">
@@ -203,10 +239,7 @@ export function App(): ReactElement {
           <span><strong>mercado</strong><small>punto de venta</small></span>
         </a>
         <nav className="top-nav" aria-label="Secciones de caja">
-          <button className={activePage === "catalog" ? "current" : ""} onClick={() => setActivePage("catalog")}>Catálogo</button>
-          <button className={activePage === "sales" ? "current" : ""} onClick={() => setActivePage("sales")}>Nueva venta</button>
-          <button className={activePage === "clients" ? "current" : ""} onClick={() => setActivePage("clients")}>Clientes</button>
-          <button className={activePage === "history" ? "current" : ""} onClick={() => setActivePage("history")}>Historial</button>
+          {availablePages.map(({ id, label }) => <button key={id} className={activePage === id ? "current" : ""} onClick={() => setActivePage(id)}>{label}</button>)}
         </nav>
         <div className="font-size-control" role="group" aria-label="Tamaño de letra">
           <span aria-hidden="true">Texto</span>
@@ -234,10 +267,10 @@ export function App(): ReactElement {
             onClick={() => setFontScale(100)}
           >↺</button>
         </div>
-        <div className="local-status"><span className="status-light" /> Operación local <span className="status-divider">·</span> {platform}</div>
+        <div className="local-status"><span className="status-light" /> {authState.user.username} · {roleLabel(authState.user.role)} <button className="logout-button" type="button" onClick={() => void logout()}>Salir</button> <span className="status-divider">·</span> {platform}</div>
       </header>
 
-      {activePage === "history" ? <SalesHistoryScreen /> : activePage === "clients" ? <ClientsScreen /> : activePage === "sales" ? <SalesScreen onBackToCatalog={() => setActivePage("catalog")} /> : <>
+      {activePage === "users" ? <UsersScreen /> : activePage === "history" ? <SalesHistoryScreen /> : activePage === "clients" ? <ClientsScreen /> : activePage === "sales" ? <SalesScreen showSalesHistory={roleCan(authState.user.role, "sales:history")} onBackToCatalog={() => setActivePage(roleCan(authState.user!.role, "catalog:read") ? "catalog" : "sales")} /> : <>
       <section className="page-heading">
         <div><p className="eyebrow">Administración de productos</p><h1>Catálogo e inventario</h1><p className="subheading">Tus productos y existencias, disponibles incluso sin internet.</p></div>
         <button className="primary-button" onClick={() => { setMessage(""); setEditing(null); }}><span aria-hidden="true">＋</span> Nuevo producto</button>
@@ -286,9 +319,30 @@ export function App(): ReactElement {
       {message && <div className="toast" role="status"><span>{message}</span><button aria-label="Cerrar mensaje" onClick={() => setMessage("")}>×</button></div>}
       </>}
 
-      <footer className="app-footer"><span>Mercado POS Colombia</span><span>{activePage === "catalog" ? "Catálogo local · Sin conexión requerida" : activePage === "clients" ? "Clientes locales · Perfiles opcionales" : "Venta local · Pendiente de facturación electrónica"}</span></footer>
+      <footer className="app-footer"><span>Mercado POS Colombia</span><span>{activePage === "catalog" ? "Catálogo local · Sin conexión requerida" : activePage === "clients" ? "Clientes locales · Perfiles opcionales" : activePage === "users" ? "Usuarios locales · Contraseñas con hash" : activePage === "history" ? "Historial local · Datos de este equipo" : "Venta local · Pendiente de facturación electrónica"}</span></footer>
     </main>
   );
+}
+
+function pagesForRole(role: UserRole): { id: Page; label: string }[] {
+  const pages: { id: Page; label: string; capability: Parameters<typeof roleCan>[1] }[] = [
+    { id: "catalog", label: "Catálogo", capability: "catalog:read" },
+    { id: "sales", label: "Nueva venta", capability: "sales:create" },
+    { id: "clients", label: "Clientes", capability: "clients:read" },
+    { id: "history", label: "Historial", capability: "sales:history" },
+    { id: "users", label: "Usuarios", capability: "users:manage" }
+  ];
+  return pages.filter((page) => roleCan(role, page.capability)).map(({ id, label }) => ({ id, label }));
+}
+
+function defaultPage(role: UserRole): Page {
+  if (roleCan(role, "sales:create")) return "sales";
+  if (roleCan(role, "catalog:read")) return "catalog";
+  return "history";
+}
+
+function roleLabel(role: UserRole): string {
+  return ({ admin_master: "AdminMaster", admin: "Admin", employee_manager: "EmpleadoJefe", employee: "Empleado" })[role];
 }
 
 function readFontScale(): (typeof FONT_SIZE_STEPS)[number] {

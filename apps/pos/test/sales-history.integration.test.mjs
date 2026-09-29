@@ -168,7 +168,11 @@ test("IPC rechaza remitentes, IDs, rutas, HTML y formatos ajenos al contrato; se
   const frame = {};
   const window = { isDestroyed: () => false, webContents: { mainFrame: frame } };
   const event = { sender: window.webContents, senderFrame: frame };
-  const handlers = createSalesHandlers(sales, receipts, () => window);
+  const testAuth = {
+    requireUser: () => ({ id: "admin-test", role: "admin" }),
+    requireCapability: () => ({ id: "admin-test", role: "admin" })
+  };
+  const handlers = createSalesHandlers(sales, receipts, () => window, testAuth);
   for (const handler of Object.values(handlers)) {
     assert.throws(() => handler({ sender: {}, senderFrame: frame }), /no autorizada/);
     assert.throws(() => handler({ ...event, senderFrame: {} }), /no autorizada/);

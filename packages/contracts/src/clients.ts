@@ -34,6 +34,16 @@ export const ClientSearchSchema = Type.Object({
   includeInactive: Type.Boolean()
 }, { additionalProperties: false });
 
+export const SaleClientSearchSchema = Type.Object({ query: Type.String({ minLength: 1, maxLength: 120 }) }, { additionalProperties: false });
+
+export const SaleClientMatchSchema = Type.Object({
+  id: ClientIdSchema,
+  name: Type.String({ minLength: 1, maxLength: 120 }),
+  documentType: Type.Union([Type.String({ maxLength: 32 }), Type.Null()]),
+  documentNumber: Type.Union([Type.String({ maxLength: 64 }), Type.Null()]),
+  email: Type.Union([Type.String({ maxLength: 254 }), Type.Null()])
+}, { additionalProperties: false });
+
 export const BuyerSnapshotSchema = Type.Object({
   clientId: ClientIdSchema,
   name: Type.String({ minLength: 1, maxLength: 120 }),
@@ -46,4 +56,6 @@ export type ClientCreateInput = Static<typeof ClientCreateSchema>;
 export type ClientUpdateInput = Static<typeof ClientUpdateSchema>;
 export type Client = Static<typeof ClientSchema>;
 export type ClientSearchInput = Static<typeof ClientSearchSchema>;
+export type SaleClientSearchInput = Static<typeof SaleClientSearchSchema>;
+export type SaleClientMatch = Static<typeof SaleClientMatchSchema>;
 export type BuyerSnapshot = Static<typeof BuyerSnapshotSchema>;

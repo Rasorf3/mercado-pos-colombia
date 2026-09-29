@@ -12,7 +12,7 @@ import { LOCAL_SALES_MIGRATION } from "../src/main/database/migrations/002_local
 const directory = mkdtempSync(join(tmpdir(), "mercado-pos-clients-migration-"));
 const filePath = join(directory, "version-two.sqlite");
 
-test("la migración v3 conserva las ventas previas con instantánea de comprador vacía", (context) => {
+test("la migración v4 conserva las ventas previas y sus compradores vacíos", (context) => {
   const legacy = new Database(filePath);
   legacy.defaultSafeIntegers(true);
   legacy.pragma("foreign_keys = ON");
@@ -32,7 +32,8 @@ test("la migración v3 conserva las ventas previas con instantánea de comprador
     rmSync(directory, { recursive: true, force: true });
   });
 
-  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 3n);
+  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 4n);
+  assert.equal(upgraded.prepare("SELECT created_by_user_id FROM sales WHERE id = ?").get(saleId).created_by_user_id, null);
   assert.deepEqual(upgraded.prepare(`
     SELECT client_id, buyer_name, document_type, document_number, email
     FROM sale_buyer_snapshots WHERE sale_id = ?

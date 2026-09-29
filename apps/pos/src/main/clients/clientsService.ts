@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 import { normalizeClientDraft } from "@mercado-pos/domain";
-import type { Client, ClientCreateInput, ClientSearchInput, ClientUpdateInput } from "@mercado-pos/contracts";
+import type { Client, ClientCreateInput, ClientSearchInput, ClientUpdateInput, SaleClientMatch } from "@mercado-pos/contracts";
 
 interface ClientRow {
   id: string;
@@ -60,28 +60,51 @@ export class ClientsService {
     return rows.map(toClient);
   }
 
-  create(input: ClientCreateInput): Client {
+  listForSale(query: string): SaleClientMatch[] {
+    const normalized = query.trim();
+    const rows = this.database.prepare(`
+      SELECT id, name, document_type, document_number, email
+      FROM clients
+      WHERE active = 1 AND (
+        instr(lower(name), lower(?)) > 0
+        OR instr(lower(COALESCE(document_type, '')), lower(?)) > 0
+        OR instr(lower(COALESCE(document_number, '')), lower(?)) > 0
+        OR instr(lower(COALESCE(email, '')), lower(?)) > 0
+      )
+      ORDER BY name COLLATE NOCASE LIMIT 25
+    `).all(normalized, normalized, normalized, normalized) as Pick<ClientRow, "id" | "name" | "document_type" | "document_number" | "email">[];
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      documentType: row.document_type,
+      documentNumber: row.document_number,
+      email: row.email
+    }));
+  }
+
+  create(input: ClientCreateInput, actorUserId: string | null = null): Client {
     const draft = normalizeClientDraft(input);
     const id = randomUUID();
     const now = new Date().toISOString();
     try {
       this.database.prepare(`
         INSERT INTO clients (
-          id, name, document_type, document_number, email, active, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-      `).run(id, draft.name, draft.documentType, draft.documentNumber, draft.email, now, now);
+          id, name, document_type, document_number, email, active, created_at, updated_at,
+          created_by_user_id, updated_by_user_id
+        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+      `).run(id, draft.name, draft.documentType, draft.documentNumber, draft.email, now, now, actorUserId, actorUserId);
     } catch (error) {
       throw translateDatabaseError(error);
     }
     return this.getById(id);
   }
 
-  update(id: string, input: ClientUpdateInput): Client {
+  update(id: string, input: ClientUpdateInput, actorUserId: string | null = null): Client {
     const draft = normalizeClientDraft(input);
     try {
       const result = this.database.prepare(`
         UPDATE clients SET name = ?, document_type = ?, document_number = ?, email = ?,
-          active = ?, updated_at = ?
+          active = ?, updated_at = ?, updated_by_user_id = ?
         WHERE id = ?
       `).run(
         draft.name,
@@ -90,6 +113,7 @@ export class ClientsService {
         draft.email,
         input.active ? 1n : 0n,
         new Date().toISOString(),
+        actorUserId,
         id
       );
       if (result.changes !== 1) throw new ClientNotFoundError();

@@ -5,10 +5,12 @@ import type {
   Product,
   ProductCreateInput,
   ProductSearchInput,
+  SaleProduct,
   ProductUpdateInput
 } from "@mercado-pos/contracts";
 
 export const CATALOG_CHANNELS = {
+  searchProductsForSale: "catalog:search-products-for-sale",
   listProducts: "catalog:list-products",
   createProduct: "catalog:create-product",
   updateProduct: "catalog:update-product",
@@ -18,6 +20,7 @@ export const CATALOG_CHANNELS = {
 } as const;
 
 export interface CatalogBridge {
+  searchProductsForSale(query: string): Promise<SaleProduct[]>;
   listProducts(input: ProductSearchInput): Promise<Product[]>;
   createProduct(input: ProductCreateInput): Promise<Product>;
   updateProduct(id: string, input: ProductUpdateInput): Promise<Product>;

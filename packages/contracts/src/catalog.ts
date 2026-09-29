@@ -57,9 +57,24 @@ export const ProductSchema = Type.Object({
   updatedAt: Type.String({ format: "date-time" })
 }, { additionalProperties: false });
 
+export const SaleProductSchema = Type.Object({
+  id: UuidSchema,
+  name: Type.String({ minLength: 1, maxLength: 120 }),
+  internalCode: Type.String({ minLength: 1, maxLength: 64 }),
+  barcode: Type.Union([Type.String({ minLength: 1, maxLength: 64 }), Type.Null()]),
+  salePriceCop: CopIntegerSchema,
+  unit: ProductUnitSchema,
+  active: Type.Boolean(),
+  stock: QuantityInputSchema
+}, { additionalProperties: false });
+
 export const ProductSearchSchema = Type.Object({
   query: Type.String({ maxLength: 120 }),
   includeInactive: Type.Boolean()
+}, { additionalProperties: false });
+
+export const SaleProductSearchSchema = Type.Object({
+  query: Type.String({ maxLength: 120 })
 }, { additionalProperties: false });
 
 export const InventoryEntrySchema = Type.Object({
@@ -171,7 +186,9 @@ export type ProductUnit = Static<typeof ProductUnitSchema>;
 export type ProductCreateInput = Static<typeof ProductCreateSchema>;
 export type ProductUpdateInput = Static<typeof ProductUpdateSchema>;
 export type Product = Static<typeof ProductSchema>;
+export type SaleProduct = Static<typeof SaleProductSchema>;
 export type ProductSearchInput = Static<typeof ProductSearchSchema>;
+export type SaleProductSearchInput = Static<typeof SaleProductSearchSchema>;
 export type InventoryEntryInput = Static<typeof InventoryEntrySchema>;
 export type InventoryAdjustmentInput = Static<typeof InventoryAdjustmentSchema>;
 export type InventoryMovement = Static<typeof InventoryMovementSchema>;

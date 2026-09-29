@@ -86,7 +86,7 @@ export class SalesService {
     this.database = database;
   }
 
-  createSale(input: SaleCreateInput): Sale {
+  createSale(input: SaleCreateInput, actorUserId: string | null = null): Sale {
     const requestedLines = combineSaleQuantities(input.items);
     const create = this.database.transaction(() => {
       const buyer = input.clientId ? this.getActiveBuyer(input.clientId) : null;
@@ -121,9 +121,9 @@ export class SalesService {
       const createdAt = new Date().toISOString();
 
       this.database.prepare(`
-        INSERT INTO sales (id, status, total_cop, created_at)
-        VALUES (?, 'local_pending_invoice', ?, ?)
-      `).run(saleId, amounts.totalCop, createdAt);
+        INSERT INTO sales (id, status, total_cop, created_at, created_by_user_id)
+        VALUES (?, 'local_pending_invoice', ?, ?, ?)
+      `).run(saleId, amounts.totalCop, createdAt, actorUserId);
 
       this.database.prepare(`
         INSERT INTO sale_buyer_snapshots (
@@ -176,18 +176,18 @@ export class SalesService {
 
       const updateStock = this.database.prepare(`
         UPDATE products
-        SET stock_milli = ?, updated_at = ?
+        SET stock_milli = ?, updated_at = ?, updated_by_user_id = ?
         WHERE id = ? AND active = 1 AND stock_milli = ?
       `);
       const insertMovement = this.database.prepare(`
         INSERT INTO inventory_movements (
           id, product_id, sale_id, type, quantity_milli, stock_before_milli,
-          stock_after_milli, note, created_at
-        ) VALUES (?, ?, ?, 'sale_out', ?, ?, ?, ?, ?)
+          stock_after_milli, note, created_at, created_by_user_id
+        ) VALUES (?, ?, ?, 'sale_out', ?, ?, ?, ?, ?, ?)
       `);
 
       for (const { product, quantityMilli, stockAfterMilli } of lines) {
-        const update = updateStock.run(stockAfterMilli, createdAt, product.id, product.stock_milli);
+        const update = updateStock.run(stockAfterMilli, createdAt, actorUserId, product.id, product.stock_milli);
         if (update.changes !== 1) {
           throw new Error(`No se pudo actualizar la existencia de ${product.name}.`);
         }
@@ -199,7 +199,8 @@ export class SalesService {
           product.stock_milli,
           stockAfterMilli,
           `Venta local ${saleId}`,
-          createdAt
+          createdAt,
+          actorUserId
         );
       }
 
@@ -207,6 +208,14 @@ export class SalesService {
     });
 
     return create.immediate();
+  }
+
+  getSaleCreatorId(id: string): string | null {
+    validateSalesRequest<string>(SaleIdSchema, id);
+    const row = this.database.prepare("SELECT created_by_user_id FROM sales WHERE id = ?")
+      .get(id) as { created_by_user_id: string | null } | undefined;
+    if (!row) throw new SaleNotFoundError();
+    return row.created_by_user_id;
   }
 
   listRecentSales(): SaleSummary[] {

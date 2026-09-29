@@ -2,6 +2,8 @@
 
 Aplicación local de catálogo, inventario y ventas mínimas para un punto de venta en Colombia. Usa Node.js 24, npm workspaces, Electron Forge con React para la caja y Fastify para una API separada.
 
+El acceso a la caja requiere usuario y contraseña. El primer inicio configura un Admin; Admin puede crear cuentas Admin o Empleado. Las funciones de catálogo, inventario, ventas, clientes e historial se habilitan según rol y se autorizan también en el proceso principal.
+
 La caja registra ventas locales offline en SQLite con descuento de existencias y un medio de pago declarado. Permite mantener clientes locales opcionales y asociarlos a una venta; las ventas conservan una instantánea histórica del comprador. Incluye historial paginado, detalle e impresión o exportación PDF de comprobantes locales de 58 y 80 mm. Las ventas quedan pendientes de integración con facturación electrónica: no se emiten ni se envían a la DIAN. No incluye procesamiento o verificación de pagos, sincronización con PostgreSQL, proveedores ni suscripciones.
 
 ## Requisitos
@@ -46,6 +48,8 @@ El documento muestra **COMPROBANTE LOCAL — NO ES FACTURA ELECTRÓNICA** y mant
 
 Consulta los límites, las pruebas y la reproducción de PDFs sintéticos en [`docs/local-sales-history-and-receipts.md`](docs/local-sales-history-and-receipts.md).
 
+Consulta [`docs/users-and-roles.md`](docs/users-and-roles.md) para la matriz de permisos, la cuenta inicial, las decisiones de AdminMaster y los límites de seguridad local.
+
 En cualquier sección, usa **A−** y **A+** en la barra superior para ajustar el tamaño de letra entre 100 % y 150 %; **↺** lo restablece. La preferencia se guarda localmente en esta caja.
 
 ## Estructura
@@ -73,6 +77,7 @@ En cualquier sección, usa **A−** y **A+** en la barra superior para ajustar e
 - Venta, instantánea opcional del comprador, pago y salidas de inventario se guardan en una transacción SQLite; el estado es `local_pending_invoice`, nunca una factura DIAN. La instantánea no cambia si luego se edita o desactiva el perfil.
 - Solo se registra un método por venta. No se procesan tarjetas ni se verifican transferencias; las referencias/códigos opcionales no reemplazan credenciales.
 - El acceso a SQLite ocurre solo en el proceso principal de Electron. El renderer recibe operaciones limitadas mediante `preload`.
+- Las contraseñas se almacenan como hashes `scrypt` con sal individual; la sesión no persiste al reiniciar la aplicación. AdminMaster no tiene cuenta o secreto integrado y no se puede asignar desde la interfaz.
 - No se guardan certificados digitales, credenciales ni tokens. Los datos de clientes viven solo en la SQLite local de la caja.
 - La documentación de DIAN describe decisiones pendientes y no habilita llamadas externas.
 
