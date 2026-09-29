@@ -11,6 +11,7 @@ Ya existen:
 - Catálogo local: crear, editar, buscar y desactivar productos; código de barras único.
 - Inventario local: existencias iniciales, entradas, ajustes y salidas de venta como movimientos trazables. No cambies el stock sin insertar el movimiento correspondiente.
 - Venta local mínima offline: un método de pago por venta, instantánea de las líneas, descuento de inventario y persistencia dentro de una transacción SQLite. El estado es `local_pending_invoice`; no es factura electrónica ni acredita envío, validación o aceptación por la DIAN.
+- La caja presenta la venta en dos pasos secuenciales a ancho completo: búsqueda/carrito y después resumen/pago. El campo de efectivo arranca en cero y limpia ese cero al recibir el foco para evitar prefijos accidentales.
 - Clientes locales: crear, editar, buscar y desactivar perfiles; ventas pueden omitir comprador o guardar una instantánea inmutable del cliente elegido dentro de la transacción de venta. Solo se guardan nombre, tipo/número de identificación y correo opcional.
 - Historial local paginado y filtrado por días de Colombia (UTC−5), con detalle de las instantáneas guardadas. Reutiliza las tablas e índice existentes, sin migración nueva.
 - Comprobante local de 58/80 mm con impresión mediante diálogo y PDF mediante selección de ubicación, accesibles al cerrar la venta y desde su detalle. Los márgenes/largo por página son configurables; no hay recursos de internet ni efectos sobre ventas o inventario al reimprimir.

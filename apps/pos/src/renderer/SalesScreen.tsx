@@ -22,9 +22,12 @@ interface CartLine {
   quantity: string;
 }
 
+type SaleStep = "products" | "payment";
+
 export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props): ReactElement {
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [saleStep, setSaleStep] = useState<SaleStep>("products");
   const [query, setQuery] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [amountPaidCop, setAmountPaidCop] = useState("0");
@@ -40,6 +43,8 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const paymentMethodRef = useRef<HTMLSelectElement>(null);
+  const paymentAmountRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
   const buyerRequestRef = useRef(0);
 
@@ -62,6 +67,15 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
   useEffect(() => {
     setAmountPaidCop(method === "cash" ? "0" : totalCop);
   }, [totalCop, method]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (saleStep === "products") searchRef.current?.focus();
+      else if (method === "cash") paymentAmountRef.current?.focus();
+      else paymentMethodRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [method, saleStep]);
 
   const stockError = useMemo(() => {
     if (!calculation.value) return "";
@@ -172,6 +186,12 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
     setCart((current) => current.map((line) => line.product.id === productId ? { ...line, quantity } : line));
   };
 
+  const removeCartProduct = (productId: string) => {
+    const removingLastProduct = cart.length === 1 && cart[0]?.product.id === productId;
+    setCart((current) => current.filter((line) => line.product.id !== productId));
+    if (saleStep === "payment" && removingLastProduct) setSaleStep("products");
+  };
+
   const submitSale = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy || !calculation.value || !paymentResult.value || stockError) return;
@@ -192,6 +212,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
       const sale = await window.electronAPI.sales.createSale(input);
       setCompletedSale(sale);
       setCart([]);
+      setSaleStep("products");
       setSelectedBuyer(null);
       setBuyerSearch("");
       setReference("");
@@ -255,73 +276,81 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
 
       {completedSale && <CompletedSale sale={completedSale} onDetail={() => void openDetail(completedSale.id)} />}
 
-      <div className="sales-layout">
-        <section className="sale-products-panel">
-          <div className="sale-panel-title"><div><p className="eyebrow">Paso 1</p><h2>Agregar productos</h2></div><span className="count-chip">{cart.length} {cart.length === 1 ? "producto" : "productos"}</span></div>
-          <label className="search-box sale-search-box">
-            <span className="search-icon" aria-hidden="true">⌕</span>
-            <input ref={searchRef} autoFocus type="search" value={query} placeholder="Buscar o escanear código de barras…" aria-label="Buscar producto para la venta" onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void scanBarcode(); } }} />
-            <kbd>Enter</kbd>
-          </label>
-          <p className="scanner-hint">Lector USB: escanea y confirma con Enter para agregar el producto.</p>
-          <div className="sale-product-results">
-            {products.length === 0 ? <p className="sale-search-empty">{query ? "No hay productos coincidentes." : "No hay productos activos para vender."}</p> : products.map((product) => (
-              <article className="sale-product-row" key={product.id}>
-                <div className="sale-product-info"><strong>{product.name}</strong><span>{product.internalCode} · Disp. {product.stock} {shortUnit(product.unit)}</span></div>
-                <div className="sale-product-price"><strong>{formatCop(BigInt(product.salePriceCop))}</strong><button type="button" className="add-product-button" disabled={parseQuantityMilli(product.stock) === 0n} onClick={() => addProduct(product)} aria-label={`Agregar ${product.name}`}>＋</button></div>
-              </article>
-            ))}
-          </div>
-        </section>
+      <nav className="sale-stepper" aria-label="Pasos de la venta">
+        <button type="button" className={saleStep === "products" ? "active" : ""} aria-current={saleStep === "products" ? "step" : undefined} onClick={() => setSaleStep("products")}><span>1</span> Productos</button>
+        <span className="sale-step-connector" aria-hidden="true" />
+        <button type="button" className={saleStep === "payment" ? "active" : ""} aria-current={saleStep === "payment" ? "step" : undefined} disabled={!calculation.value || Boolean(stockError)} onClick={() => setSaleStep("payment")}><span>2</span> Pago</button>
+      </nav>
 
-        <form className="sale-checkout-panel" onSubmit={(event) => void submitSale(event)}>
-          <div className="sale-panel-title"><div><p className="eyebrow">Paso 2</p><h2>Resumen y pago</h2></div><button type="button" className="quiet-small" disabled={cart.length === 0} onClick={() => setCart([])}>Vaciar</button></div>
-          {cart.length === 0 ? <div className="cart-empty"><span aria-hidden="true">▱</span><strong>La venta está vacía</strong><small>Agrega productos para calcular el total.</small></div> : (
-            <div className="cart-lines">
-              {cart.map((line, index) => (
-                <article className="cart-line" key={line.product.id}>
-                  <div className="cart-line-top"><div><strong>{line.product.name}</strong><small>{formatCop(BigInt(line.product.salePriceCop))} / {shortUnit(line.product.unit)}</small></div><button type="button" className="remove-line" onClick={() => setCart((current) => current.filter((item) => item.product.id !== line.product.id))} aria-label={`Quitar ${line.product.name}`}>×</button></div>
-                  <div className="cart-line-bottom"><label className="quantity-field">Cantidad<input required inputMode="decimal" maxLength={24} pattern="[0-9]+([.,][0-9]{1,3})?" value={line.quantity} onChange={(event) => updateQuantity(line.product.id, event.target.value)} aria-label={`Cantidad de ${line.product.name}`} /></label><span className="cart-line-total">{lineTotals[index] === undefined ? "—" : formatCop(lineTotals[index])}</span></div>
-                </article>
-              ))}
-            </div>
-          )}
+      {saleStep === "products" ? <section className="sale-products-panel sale-step-panel">
+        <div className="sale-panel-title"><div><p className="eyebrow">Paso 1</p><h2>Agregar productos</h2></div><span className="count-chip">{cart.length} {cart.length === 1 ? "producto" : "productos"}</span></div>
+        <label className="search-box sale-search-box">
+          <span className="search-icon" aria-hidden="true">⌕</span>
+          <input ref={searchRef} autoFocus type="search" value={query} placeholder="Buscar o escanear código de barras…" aria-label="Buscar producto para la venta" onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void scanBarcode(); } }} />
+          <kbd>Enter</kbd>
+        </label>
+        <p className="scanner-hint">Lector USB: escanea y confirma con Enter para agregar el producto.</p>
+        <div className="sale-product-results">
+          {products.length === 0 ? <p className="sale-search-empty">{query ? "No hay productos coincidentes." : "No hay productos activos para vender."}</p> : products.map((product) => (
+            <article className="sale-product-row" key={product.id}>
+              <div className="sale-product-info"><strong>{product.name}</strong><span>{product.internalCode} · Disp. {product.stock} {shortUnit(product.unit)}</span></div>
+              <div className="sale-product-price"><strong>{formatCop(BigInt(product.salePriceCop))}</strong><button type="button" className="add-product-button" disabled={parseQuantityMilli(product.stock) === 0n} onClick={() => addProduct(product)} aria-label={`Agregar ${product.name}`}>＋</button></div>
+            </article>
+          ))}
+        </div>
 
+        <div className="sale-workspace-cart">
+          <div className="sale-cart-heading"><div><p className="eyebrow">Carrito</p><h3>Productos de esta venta</h3></div><button type="button" className="quiet-small" disabled={cart.length === 0} onClick={() => setCart([])}>Vaciar</button></div>
+          {cart.length === 0 ? <div className="cart-empty"><span aria-hidden="true">▱</span><strong>Agrega productos a la venta</strong><small>El carrito aparecerá aquí para que revises cantidades e importes.</small></div> : <SaleCartLines cart={cart} lineTotals={lineTotals} onQuantityChange={updateQuantity} onRemove={removeCartProduct} />}
           <div className="sale-total-row"><span>Total de la venta</span><strong>{formatCop(due)}</strong></div>
           {calculation.error && <p className="form-error" role="alert">{calculation.error}</p>}
           {stockError && <p className="form-error" role="alert">{stockError}</p>}
+          <div className="sale-step-actions"><span>{cart.length === 0 ? "Primero agrega al menos un producto." : "Revisa las cantidades antes de continuar."}</span><button type="button" className="primary-button" disabled={!calculation.value || Boolean(stockError)} onClick={() => setSaleStep("payment")}>Continuar al pago →</button></div>
+        </div>
+      </section> : <form className="sale-checkout-panel sale-step-panel" onSubmit={(event) => void submitSale(event)}>
+        <div className="sale-panel-title"><div><p className="eyebrow">Paso 2</p><h2>Resumen y pago</h2></div><button type="button" className="quiet-button" onClick={() => setSaleStep("products")}>← Editar productos</button></div>
+        <div className="sale-payment-content">
+          <section className="sale-payment-summary" aria-labelledby="payment-summary-title">
+            <div className="sale-cart-heading"><div><p className="eyebrow">Resumen</p><h3 id="payment-summary-title">Productos de esta venta</h3></div></div>
+            <SaleCartLines cart={cart} lineTotals={lineTotals} onQuantityChange={updateQuantity} onRemove={removeCartProduct} />
+            <div className="sale-total-row"><span>Total de la venta</span><strong>{formatCop(due)}</strong></div>
+            {calculation.error && <p className="form-error" role="alert">{calculation.error}</p>}
+            {stockError && <p className="form-error" role="alert">{stockError}</p>}
+          </section>
 
-          <div className="sale-buyer-field">
-            <div className="sale-buyer-heading"><strong>Comprador</strong><span className="optional-label">opcional</span></div>
-            {selectedBuyer ? <div className="selected-buyer">
-              <div><strong>{selectedBuyer.name}</strong><small>{formatClientIdentity(selectedBuyer) || selectedBuyer.email || "Sin identificación ni correo"}</small></div>
-              <button type="button" className="quiet-small" onClick={() => setSelectedBuyer(null)}>Quitar</button>
-            </div> : <>
-              {!creatingBuyer && <input className="buyer-search-input" type="search" maxLength={120} value={buyerSearch} placeholder="Busca nombre, identificación o correo" aria-label="Buscar cliente para asociar a la venta" onChange={(event) => setBuyerSearch(event.target.value)} />}
-              {buyerSearch.trim() && <div className="buyer-match-list">
-                {buyerMatches.length === 0 ? <p>{"Sin clientes activos coincidentes."}</p> : buyerMatches.map((client) => <button type="button" key={client.id} onClick={() => { setSelectedBuyer(client); setBuyerSearch(""); setBuyerMatches([]); }}>
-                  <strong>{client.name}</strong><small>{formatClientIdentity(client) || client.email || "Sin identificación ni correo"}</small>
-                </button>)}
-              </div>}
-              {creatingBuyer ? <QuickClientCreateForm onCancel={() => setCreatingBuyer(false)} onSave={createBuyer} /> : <button type="button" className="text-button quick-client-trigger" onClick={() => { setBuyerSearch(""); setBuyerMatches([]); setCreatingBuyer(true); }}>＋ Crear cliente y asociar</button>}
-            </>}
-            <small>También puedes registrar la venta sin perfil de comprador.</small>
+          <div className="sale-payment-options">
+            <div className="sale-buyer-field">
+              <div className="sale-buyer-heading"><strong>Comprador</strong><span className="optional-label">opcional</span></div>
+              {selectedBuyer ? <div className="selected-buyer">
+                <div><strong>{selectedBuyer.name}</strong><small>{formatClientIdentity(selectedBuyer) || selectedBuyer.email || "Sin identificación ni correo"}</small></div>
+                <button type="button" className="quiet-small" onClick={() => setSelectedBuyer(null)}>Quitar</button>
+              </div> : <>
+                {!creatingBuyer && <input className="buyer-search-input" type="search" maxLength={120} value={buyerSearch} placeholder="Busca nombre, identificación o correo" aria-label="Buscar cliente para asociar a la venta" onChange={(event) => setBuyerSearch(event.target.value)} />}
+                {buyerSearch.trim() && <div className="buyer-match-list">
+                  {buyerMatches.length === 0 ? <p>Sin clientes activos coincidentes.</p> : buyerMatches.map((client) => <button type="button" key={client.id} onClick={() => { setSelectedBuyer(client); setBuyerSearch(""); setBuyerMatches([]); }}>
+                    <strong>{client.name}</strong><small>{formatClientIdentity(client) || client.email || "Sin identificación ni correo"}</small>
+                  </button>)}
+                </div>}
+                {creatingBuyer ? <QuickClientCreateForm onCancel={() => setCreatingBuyer(false)} onSave={createBuyer} /> : <button type="button" className="text-button quick-client-trigger" onClick={() => { setBuyerSearch(""); setBuyerMatches([]); setCreatingBuyer(true); }}>＋ Crear cliente y asociar</button>}
+              </>}
+              <small>También puedes registrar la venta sin perfil de comprador.</small>
+            </div>
+
+            <div className="payment-fields">
+              <label className="field">Método de pago<select ref={paymentMethodRef} value={method} onChange={(event) => { const nextMethod = event.target.value as PaymentMethod; setMethod(nextMethod); setReference(""); setAuthorizationCode(""); setAmountPaidCop(nextMethod === "cash" ? "0" : totalCop); }}>{PAYMENT_METHOD_OPTIONS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
+              <label className="field">{method === "cash" ? "Efectivo recibido (COP)" : "Valor pagado (COP)"}<input ref={paymentAmountRef} required inputMode="numeric" pattern="[0-9]+" maxLength={19} value={amountPaidCop} readOnly={method !== "cash"} placeholder="Escribe el valor recibido" onFocus={(event) => { if (method === "cash" && event.currentTarget.value === "0") setAmountPaidCop(""); }} onChange={(event) => setAmountPaidCop(event.target.value)} /></label>
+              {paymentResult.value?.changeCop ? <div className="change-due"><span>Cambio</span><strong>{formatCop(paymentResult.value.changeCop)}</strong></div> : null}
+              {showReference && <label className="field full-payment-field">Referencia de operación <span className="optional-label">opcional</span><input maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} placeholder="No ingreses claves ni datos bancarios" /></label>}
+              {showAuthorization && <label className="field full-payment-field">Código de autorización <span className="optional-label">opcional</span><input maxLength={64} value={authorizationCode} onChange={(event) => setAuthorizationCode(event.target.value)} placeholder="No ingreses número de tarjeta, CVV ni PIN" /></label>}
+            </div>
+            {paymentResult.error && <p className="form-error" role="alert">{paymentResult.error}</p>}
+            <button className="primary-button complete-sale-button" type="submit" disabled={busy || cart.length === 0 || !calculation.value || !paymentResult.value || Boolean(stockError)}>{busy ? "Guardando venta…" : "Registrar venta local"}</button>
+            <p className="payment-disclaimer">Solo registra el medio y valor declarado. No procesa tarjetas ni verifica transferencias.</p>
           </div>
+        </div>
+      </form>}
 
-          <div className="payment-fields">
-            <label className="field">Método de pago<select value={method} onChange={(event) => { const nextMethod = event.target.value as PaymentMethod; setMethod(nextMethod); setReference(""); setAuthorizationCode(""); setAmountPaidCop(nextMethod === "cash" ? "0" : totalCop); }}>{PAYMENT_METHOD_OPTIONS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
-            <label className="field">{method === "cash" ? "Efectivo recibido (COP)" : "Valor pagado (COP)"}<input required inputMode="numeric" pattern="[0-9]+" maxLength={19} value={amountPaidCop} readOnly={method !== "cash"} onChange={(event) => setAmountPaidCop(event.target.value)} /></label>
-            {paymentResult.value?.changeCop ? <div className="change-due"><span>Cambio</span><strong>{formatCop(paymentResult.value.changeCop)}</strong></div> : null}
-            {showReference && <label className="field full-payment-field">Referencia de operación <span className="optional-label">opcional</span><input maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} placeholder="No ingreses claves ni datos bancarios" /></label>}
-            {showAuthorization && <label className="field full-payment-field">Código de autorización <span className="optional-label">opcional</span><input maxLength={64} value={authorizationCode} onChange={(event) => setAuthorizationCode(event.target.value)} placeholder="No ingreses número de tarjeta, CVV ni PIN" /></label>}
-          </div>
-          {paymentResult.error && <p className="form-error" role="alert">{paymentResult.error}</p>}
-          <button className="primary-button complete-sale-button" type="submit" disabled={busy || cart.length === 0 || !calculation.value || !paymentResult.value || Boolean(stockError)}>{busy ? "Guardando venta…" : "Registrar venta local"}</button>
-          <p className="payment-disclaimer">Solo registra el medio y valor declarado. No procesa tarjetas ni verifica transferencias.</p>
-        </form>
-      </div>
-
-      {showSalesHistory && <section className="recent-sales-panel">
+      {saleStep === "products" && showSalesHistory && <section className="recent-sales-panel">
         <div className="sale-panel-title"><div><p className="eyebrow">Historial en este equipo</p><h2>Ventas locales recientes</h2></div><span className="count-chip">{recentSales.length}</span></div>
         {recentSales.length === 0 ? <p className="sale-search-empty">Todavía no hay ventas locales.</p> : <div className="recent-sales-list">{recentSales.map((sale) => (
           <article className="recent-sale-row" key={sale.id}>
@@ -348,6 +377,20 @@ function CompletedSale({ sale, onDetail }: { sale: Sale; onDetail: () => void })
       <ReceiptActions key={sale.id} saleId={sale.id} />
     </section>
   );
+}
+
+function SaleCartLines({ cart, lineTotals, onQuantityChange, onRemove }: {
+  cart: CartLine[];
+  lineTotals: bigint[];
+  onQuantityChange: (productId: string, quantity: string) => void;
+  onRemove: (productId: string) => void;
+}): ReactElement {
+  return <div className="cart-lines sale-cart-lines">{cart.map((line, index) => (
+    <article className="cart-line" key={line.product.id}>
+      <div className="cart-line-top"><div><strong>{line.product.name}</strong><small>{formatCop(BigInt(line.product.salePriceCop))} / {shortUnit(line.product.unit)}</small></div><button type="button" className="remove-line" onClick={() => onRemove(line.product.id)} aria-label={`Quitar ${line.product.name}`}>×</button></div>
+      <div className="cart-line-bottom"><label className="quantity-field">Cantidad<input required inputMode="decimal" maxLength={24} pattern="[0-9]+([.,][0-9]{1,3})?" value={line.quantity} onChange={(event) => onQuantityChange(line.product.id, event.target.value)} aria-label={`Cantidad de ${line.product.name}`} /></label><span className="cart-line-total">{lineTotals[index] === undefined ? "—" : formatCop(lineTotals[index])}</span></div>
+    </article>
+  ))}</div>;
 }
 
 function formatCop(value: bigint): string {
