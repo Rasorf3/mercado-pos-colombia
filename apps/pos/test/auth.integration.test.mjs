@@ -5,6 +5,7 @@ import { AuthService } from "../src/main/auth/authService.ts";
 import { CatalogService } from "../src/main/catalog/catalogService.ts";
 import { ClientsService } from "../src/main/clients/clientsService.ts";
 import { SalesService } from "../src/main/sales/salesService.ts";
+import { CashService } from "../src/main/cash/cashService.ts";
 
 test("bootstrap, login y permisos guardan hashes y revocan usuarios desactivados", async (context) => {
   const database = openPosDatabase(":memory:");
@@ -60,6 +61,7 @@ test("bootstrap, login y permisos guardan hashes y revocan usuarios desactivados
   assert.equal(catalog.listMovements(product.id)[0].createdByUsername, manager.username);
   assert.equal(catalog.listProductsForSale("CAJA-01")[0].costCop, undefined);
   const clients = new ClientsService(database);
+  new CashService(database).openSession({ openingCashCop: "0" }, admin.id);
   const client = clients.create({ name: "Comprador de prueba", documentType: null, documentNumber: null, email: null }, employee.id);
   const sale = new SalesService(database).createSale({
     items: [{ productId: product.id, quantity: "1" }], clientId: client.id,

@@ -5,16 +5,28 @@ import { join } from "node:path";
 import test from "node:test";
 import { CatalogService } from "../src/main/catalog/catalogService.ts";
 import { ClientsService } from "../src/main/clients/clientsService.ts";
+import { CashService } from "../src/main/cash/cashService.ts";
 import { openPosDatabase } from "../src/main/database/database.ts";
 import { SalesService } from "../src/main/sales/salesService.ts";
 
 const directory = mkdtempSync(join(tmpdir(), "mercado-pos-clients-"));
 let database = openPosDatabase(join(directory, "clients.sqlite"));
+seedOpenCashSession(database);
 
 test.after(() => {
   database.close();
   rmSync(directory, { recursive: true, force: true });
 });
+
+function seedOpenCashSession(database) {
+  const id = "00000000-0000-4000-8000-000000000007";
+  const now = "2026-01-01T00:00:00.000Z";
+  database.prepare(`
+    INSERT INTO pos_users (id, username, password_salt, password_hash, role, active, created_at, updated_at)
+    VALUES (?, 'testcash', ?, ?, 'admin', 1, ?, ?)
+  `).run(id, "a".repeat(32), "b".repeat(128), now, now);
+  new CashService(database).openSession({ openingCashCop: "0" }, id);
+}
 
 test("persiste, busca, edita y desactiva perfiles; la venta conserva la instantánea del comprador", () => {
   let clients = new ClientsService(database);

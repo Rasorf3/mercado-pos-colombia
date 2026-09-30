@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactElement } from "react";
 import type { Product, ProductCreateInput, ProductDiscount, ProductPromotion, ProductUpdateInput } from "@mercado-pos/contracts";
+import { CopIntegerInput } from "./CopIntegerInput";
 
 interface Props {
   product: Product | null;
@@ -64,8 +65,8 @@ export function ProductForm({ product, busy, onCancel, onCreate, onUpdate }: Pro
         <label className="field full-field">Nombre del producto<input required maxLength={120} autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Ej. Arroz blanco" /></label>
         <label className="field">Código interno<input required maxLength={64} value={internalCode} onChange={(event) => setInternalCode(event.target.value)} placeholder="Ej. ARO-001" /></label>
         <label className="field">Código de barras <span className="optional-label">opcional</span><input maxLength={64} value={barcode} onChange={(event) => setBarcode(event.target.value)} placeholder="Conserva ceros iniciales" /></label>
-        <label className="field">Costo (COP)<input required inputMode="numeric" pattern="[0-9]+" value={costCop} onChange={(event) => setCostCop(event.target.value)} placeholder="0" /></label>
-        <label className="field">Precio de venta (COP)<input required inputMode="numeric" pattern="[0-9]+" value={salePriceCop} onChange={(event) => setSalePriceCop(event.target.value)} placeholder="0" /></label>
+        <label className="field">Costo (COP)<CopIntegerInput required value={costCop} onValueChange={setCostCop} placeholder="0" /></label>
+        <label className="field">Precio de venta (COP)<CopIntegerInput required value={salePriceCop} onValueChange={setSalePriceCop} placeholder="0" /></label>
         <label className="field">Unidad de medida<select value={unit} onChange={(event) => setUnit(event.target.value as Product["unit"])}>{units.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         {unit === "unit" && <>
           <label className="field">Peso por unidad/empaque <span className="optional-label">opcional</span><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,3})?" value={weightPerUnit} onChange={(event) => setWeightPerUnit(event.target.value)} placeholder="Ej. 2.5" /><small>Permite mostrar el peso estimado de la existencia.</small></label>
@@ -76,7 +77,9 @@ export function ProductForm({ product, busy, onCancel, onCreate, onUpdate }: Pro
           <label className="active-check"><input type="checkbox" checked={promotionEnabled} onChange={(event) => setPromotionEnabled(event.target.checked)} /><span><strong>Activar promoción</strong><small>Se aplicará automáticamente en caja durante las fechas indicadas; el cajero podrá ajustarla para esa venta.</small></span></label>
           {promotionEnabled && <>
             <label className="field">Tipo de descuento<select value={promotionType} onChange={(event) => setPromotionType(event.target.value as ProductDiscount["type"])}><option value="percentage">Porcentaje (%)</option><option value="fixed">Valor fijo (COP por unidad)</option></select></label>
-            <label className="field">{promotionType === "percentage" ? "Porcentaje de descuento" : "Descuento por unidad (COP)"}<input required inputMode={promotionType === "percentage" ? "decimal" : "numeric"} pattern={promotionType === "percentage" ? "(?:100(?:[.,]0{1,2})?|(?:0|[1-9][0-9]?)(?:[.,][0-9]{1,2})?)" : "[0-9]+"} maxLength={promotionType === "percentage" ? 6 : 19} value={promotionValue} onChange={(event) => setPromotionValue(event.target.value)} placeholder={promotionType === "percentage" ? "Ej. 10 o 10,5" : "Ej. 500"} /></label>
+            <label className="field">{promotionType === "percentage" ? "Porcentaje de descuento" : "Descuento por unidad (COP)"}{promotionType === "percentage"
+              ? <input required inputMode="decimal" pattern="(?:100(?:[.,]0{1,2})?|(?:0|[1-9][0-9]?)(?:[.,][0-9]{1,2})?)" maxLength={6} value={promotionValue} onChange={(event) => setPromotionValue(event.target.value)} placeholder="Ej. 10 o 10,5" />
+              : <CopIntegerInput required value={promotionValue} onValueChange={setPromotionValue} placeholder="Ej. 500" />}</label>
             <label className="field">Vigente desde<input required type="date" value={promotionStartsOn} onChange={(event) => setPromotionStartsOn(event.target.value)} /></label>
             <label className="field">Vigente hasta<input required type="date" min={promotionStartsOn || undefined} value={promotionEndsOn} onChange={(event) => setPromotionEndsOn(event.target.value)} /></label>
             <small className="promotion-date-note">Las fechas incluyen ambos días según el calendario de Colombia.</small>

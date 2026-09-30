@@ -43,6 +43,7 @@ interface ProductForSaleRow {
 
 interface SaleRow {
   id: string;
+  cash_session_id: string | null;
   status: SaleStatus;
   total_cop: bigint;
   created_at: string;
@@ -118,6 +119,11 @@ export class SalesService {
     const create = this.database.transaction(() => {
       const createdAt = new Date().toISOString();
       const today = formatBogotaDate(new Date(createdAt));
+      const cashSession = this.database.prepare("SELECT id FROM cash_sessions WHERE status = 'open'")
+        .get() as { id: string } | undefined;
+      if (!cashSession) {
+        throw new Error("No hay una caja abierta. Pide a un usuario Admin o EmpleadoJefe que inicie el turno.");
+      }
       const buyer = input.clientId ? this.getActiveBuyer(input.clientId) : null;
       const lines = requestedLines.map((requested) => {
         const product = this.database.prepare(`
@@ -170,9 +176,9 @@ export class SalesService {
       const saleId = randomUUID();
 
       this.database.prepare(`
-        INSERT INTO sales (id, status, total_cop, created_at, created_by_user_id)
-        VALUES (?, 'local_pending_invoice', ?, ?, ?)
-      `).run(saleId, amounts.totalCop, createdAt, actorUserId);
+        INSERT INTO sales (id, status, total_cop, created_at, created_by_user_id, cash_session_id)
+        VALUES (?, 'local_pending_invoice', ?, ?, ?, ?)
+      `).run(saleId, amounts.totalCop, createdAt, actorUserId, cashSession.id);
 
       this.database.prepare(`
         INSERT INTO sale_buyer_snapshots (
@@ -285,7 +291,7 @@ export class SalesService {
       const count = this.database.prepare(`SELECT count(*) AS total FROM sales s ${where}`)
         .get(...parameters) as { total: bigint };
       const rows = this.database.prepare(`
-        SELECT s.id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
+        SELECT s.id, s.cash_session_id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
         FROM sales s LEFT JOIN pos_users u ON u.id = s.created_by_user_id ${where}
         ORDER BY s.created_at DESC, s.rowid DESC LIMIT ? OFFSET ?
       `).all(...parameters, input.pageSize, (input.page - 1) * input.pageSize) as SaleRow[];
@@ -295,6 +301,7 @@ export class SalesService {
         total: Number(count.total),
         sales: rows.map((row) => ({
           id: row.id,
+          cashSessionId: row.cash_session_id,
           status: row.status,
           totalCop: row.total_cop.toString(),
           createdByUsername: row.created_by_username,
@@ -309,7 +316,7 @@ export class SalesService {
   getSale(id: string): Sale {
     validateSalesRequest<string>(SaleIdSchema, id);
     const row = this.database.prepare(`
-      SELECT s.id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
+      SELECT s.id, s.cash_session_id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
       FROM sales s LEFT JOIN pos_users u ON u.id = s.created_by_user_id WHERE s.id = ?
     `).get(id) as SaleRow | undefined;
     if (!row) throw new SaleNotFoundError();
@@ -322,6 +329,7 @@ export class SalesService {
 
     return {
       id: row.id,
+      cashSessionId: row.cash_session_id,
       status: row.status,
       totalCop: row.total_cop.toString(),
       createdByUsername: row.created_by_username,

@@ -11,6 +11,8 @@ import { ReceiptService } from "./main/receipts/receiptService";
 import { electronReceiptOutput } from "./main/receipts/electronReceiptOutput";
 import { AuthService } from "./main/auth/authService";
 import { registerAuthIpc } from "./main/auth/authIpc";
+import { CashService } from "./main/cash/cashService";
+import { registerCashIpc } from "./main/cash/cashIpc";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -48,6 +50,7 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   posDatabase = openPosDatabase(join(app.getPath("userData"), "data", "catalog.sqlite"));
   const auth = new AuthService(posDatabase);
+  registerCashIpc(new CashService(posDatabase), () => mainWindow, auth);
   registerAuthIpc(auth, () => mainWindow);
   registerCatalogIpc(new CatalogService(posDatabase), () => mainWindow, auth);
   registerClientsIpc(new ClientsService(posDatabase), () => mainWindow, auth);

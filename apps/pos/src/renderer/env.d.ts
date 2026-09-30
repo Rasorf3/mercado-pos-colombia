@@ -3,6 +3,7 @@ import type { CatalogBridge } from "../catalogBridge";
 import type { ClientsBridge } from "../clientsBridge";
 import type { SalesBridge } from "../salesBridge";
 import type { AuthBridge } from "../authBridge";
+import type { CashBridge } from "../cashBridge";
 
 declare global {
   interface Window {
@@ -12,6 +13,7 @@ declare global {
       catalog: CatalogBridge;
       clients: ClientsBridge;
       sales: SalesBridge;
+      cash: CashBridge;
     };
   }
 }

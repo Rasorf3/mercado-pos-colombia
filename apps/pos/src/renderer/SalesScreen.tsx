@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
-import type { ClientCreateInput, PaymentMethod, ProductDiscount, SaleClientMatch, SaleProduct, Sale, SaleCreateInput, SaleSummary } from "@mercado-pos/contracts";
+import type { CashAvailability, ClientCreateInput, PaymentMethod, ProductDiscount, SaleClientMatch, SaleProduct, Sale, SaleCreateInput, SaleSummary } from "@mercado-pos/contracts";
 import { PAYMENT_METHOD_OPTIONS } from "@mercado-pos/contracts";
 import { ReceiptActions } from "./ReceiptActions";
 import { SaleDetail } from "./SaleDetail";
 import { QuickClientCreateForm } from "./QuickClientCreateForm";
+import { CopIntegerInput } from "./CopIntegerInput";
 import {
   addSaleQuantity,
   calculateSaleAmounts,
@@ -42,6 +43,8 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
   const [recentSales, setRecentSales] = useState<SaleSummary[]>([]);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [detailSale, setDetailSale] = useState<Sale | null>(null);
+  const [cashAvailability, setCashAvailability] = useState<CashAvailability | null>(null);
+  const [cashAvailabilityError, setCashAvailabilityError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -49,6 +52,14 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
   const paymentAmountRef = useRef<HTMLInputElement>(null);
   const searchRequestRef = useRef(0);
   const buyerRequestRef = useRef(0);
+
+  useEffect(() => {
+    let mounted = true;
+    void window.electronAPI.cash.availability()
+      .then((availability) => { if (mounted) setCashAvailability(availability); })
+      .catch((error: unknown) => { if (mounted) setCashAvailabilityError(errorMessage(error)); });
+    return () => { mounted = false; };
+  }, []);
 
   const calculation = useMemo(() => {
     if (cart.length === 0) return { value: null, error: "" };
@@ -309,6 +320,12 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
         <div><strong>Venta local pendiente de facturación electrónica</strong><span>No es una factura electrónica ni ha sido emitida o aceptada por la DIAN.</span></div>
       </div>
 
+      <div className={`cash-availability-banner ${cashAvailability?.isOpen ? "available" : "unavailable"}`} role="status">
+        {cashAvailability?.isOpen
+          ? <><strong>Caja abierta</strong><span>Turno iniciado por {cashAvailability.openedByUsername} · {formatDate(cashAvailability.openedAt!)}</span></>
+          : <><strong>{cashAvailabilityError ? "No se pudo consultar la caja" : cashAvailability ? "Caja cerrada" : "Consultando caja…"}</strong><span>{cashAvailabilityError || (cashAvailability ? "Un Admin o EmpleadoJefe debe abrir un turno antes de registrar ventas." : "")}</span></>}
+      </div>
+
       {completedSale && <CompletedSale sale={completedSale} onDetail={() => void openDetail(completedSale.id)} />}
 
       <nav className="sale-stepper" aria-label="Pasos de la venta">
@@ -373,13 +390,13 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
 
             <div className="payment-fields">
               <label className="field">Método de pago<select ref={paymentMethodRef} value={method} onChange={(event) => { const nextMethod = event.target.value as PaymentMethod; setMethod(nextMethod); setReference(""); setAuthorizationCode(""); setAmountPaidCop(nextMethod === "cash" ? "0" : totalCop); }}>{PAYMENT_METHOD_OPTIONS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
-              <label className="field">{method === "cash" ? "Efectivo recibido (COP)" : "Valor pagado (COP)"}<input ref={paymentAmountRef} required inputMode="numeric" pattern="[0-9]+" maxLength={19} value={amountPaidCop} readOnly={method !== "cash"} placeholder="Escribe el valor recibido" onFocus={(event) => { if (method === "cash" && event.currentTarget.value === "0") setAmountPaidCop(""); }} onChange={(event) => setAmountPaidCop(event.target.value)} /></label>
+              <label className="field">{method === "cash" ? "Efectivo recibido (COP)" : "Valor pagado (COP)"}<CopIntegerInput ref={paymentAmountRef} required value={amountPaidCop} onValueChange={setAmountPaidCop} readOnly={method !== "cash"} placeholder="Escribe el valor recibido" onFocus={(event) => { if (method === "cash" && event.currentTarget.value === "0") setAmountPaidCop(""); }} /></label>
               {paymentResult.value?.changeCop ? <div className="change-due"><span>Cambio</span><strong>{formatCop(paymentResult.value.changeCop)}</strong></div> : null}
               {showReference && <label className="field full-payment-field">Referencia de operación <span className="optional-label">opcional</span><input maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} placeholder="No ingreses claves ni datos bancarios" /></label>}
               {showAuthorization && <label className="field full-payment-field">Código de autorización <span className="optional-label">opcional</span><input maxLength={64} value={authorizationCode} onChange={(event) => setAuthorizationCode(event.target.value)} placeholder="No ingreses número de tarjeta, CVV ni PIN" /></label>}
             </div>
             {paymentResult.error && <p className="form-error" role="alert">{paymentResult.error}</p>}
-            <button className="primary-button complete-sale-button" type="submit" disabled={busy || cart.length === 0 || !calculation.value || !paymentResult.value || Boolean(stockError)}>{busy ? "Guardando venta…" : "Registrar venta local"}</button>
+            <button className="primary-button complete-sale-button" type="submit" disabled={busy || cashAvailability?.isOpen !== true || cart.length === 0 || !calculation.value || !paymentResult.value || Boolean(stockError)}>{busy ? "Guardando venta…" : "Registrar venta local"}</button>
             <p className="payment-disclaimer">Solo registra el medio y valor declarado. No procesa tarjetas ni verifica transferencias.</p>
           </div>
         </div>
@@ -429,7 +446,9 @@ function SaleCartLines({ cart, lineTotals, lineDiscounts, editableDiscount, onDi
       <div className="cart-line-top"><div><strong>{line.product.name}</strong><small>{formatCop(BigInt(line.product.salePriceCop))} / {shortUnit(line.product.unit)}</small></div><button type="button" className="remove-line" onClick={() => onRemove(line.product.id)} aria-label={`Quitar ${line.product.name}`}>×</button></div>
       <div className="cart-line-bottom"><label className="quantity-field">Cantidad<input required inputMode="decimal" maxLength={24} pattern="[0-9]+([.,][0-9]{1,3})?" value={line.quantity} onChange={(event) => onQuantityChange(line.product.id, event.target.value)} aria-label={`Cantidad de ${line.product.name}`} /></label><span className="cart-line-total">{lineTotals[index] === undefined ? "—" : formatCop(lineTotals[index])}</span></div>
       {editableDiscount && <div className="sale-discount-editor"><label>Descuento<select value={line.discount?.type ?? "none"} onChange={(event) => onDiscountTypeChange(line.product.id, event.target.value)} aria-label={`Tipo de descuento para ${line.product.name}`}><option value="none">Sin descuento</option><option value="percentage">Porcentaje</option><option value="fixed">Valor fijo por unidad</option></select></label>
-        {line.discount && <label>{line.discount.type === "percentage" ? "Porcentaje (%)" : "COP por unidad"}<input required inputMode={line.discount.type === "percentage" ? "decimal" : "numeric"} pattern={line.discount.type === "percentage" ? "(?:100(?:[.,]0{1,2})?|(?:0|[1-9][0-9]?)(?:[.,][0-9]{1,2})?)" : "[0-9]+"} maxLength={line.discount.type === "percentage" ? 6 : 19} value={line.discount.type === "percentage" ? line.discount.value : line.discount.valueCop} onChange={(event) => onDiscountValueChange(line.product.id, event.target.value)} placeholder={line.discount.type === "percentage" ? "Ej. 10 o 10,5" : "Ej. 500"} aria-label={`Valor de descuento para ${line.product.name}`} />
+        {line.discount && <label>{line.discount.type === "percentage" ? "Porcentaje (%)" : "COP por unidad"}{line.discount.type === "percentage"
+          ? <input required inputMode="decimal" pattern="(?:100(?:[.,]0{1,2})?|(?:0|[1-9][0-9]?)(?:[.,][0-9]{1,2})?)" maxLength={6} value={line.discount.value} onChange={(event) => onDiscountValueChange(line.product.id, event.target.value)} placeholder="Ej. 10 o 10,5" aria-label={`Valor de descuento para ${line.product.name}`} />
+          : <CopIntegerInput required value={line.discount.valueCop} onValueChange={(value) => onDiscountValueChange(line.product.id, value)} placeholder="Ej. 500" aria-label={`Valor de descuento para ${line.product.name}`} />}
           <small>{line.discount.type === "percentage" ? "Hasta dos decimales; máximo 100%." : "Se descuenta por cada unidad (o fracción vendida)."}</small></label>}
       </div>}
       {line.discount && <p className="sale-discount-applied">Descuento {discountLabel(line.discount)}: −{lineDiscounts[index] === undefined ? "—" : formatCop(lineDiscounts[index])}</p>}

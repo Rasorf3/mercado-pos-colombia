@@ -202,6 +202,7 @@ export const SaleLineSchema = Type.Object({
 
 export const SaleSchema = Type.Object({
   id: UuidSchema,
+  cashSessionId: Type.Union([UuidSchema, Type.Null()]),
   status: SaleStatusSchema,
   totalCop: CopIntegerSchema,
   createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
@@ -213,6 +214,7 @@ export const SaleSchema = Type.Object({
 
 export const SaleSummarySchema = Type.Object({
   id: UuidSchema,
+  cashSessionId: Type.Union([UuidSchema, Type.Null()]),
   status: SaleStatusSchema,
   totalCop: CopIntegerSchema,
   createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),

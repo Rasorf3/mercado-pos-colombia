@@ -6,6 +6,7 @@ import test from "node:test";
 import { openPosDatabase } from "../src/main/database/database.ts";
 import { CatalogService } from "../src/main/catalog/catalogService.ts";
 import { ClientsService } from "../src/main/clients/clientsService.ts";
+import { CashService } from "../src/main/cash/cashService.ts";
 import { SalesService } from "../src/main/sales/salesService.ts";
 import { ReceiptService } from "../src/main/receipts/receiptService.ts";
 import { renderReceipt } from "../src/main/receipts/receiptTemplate.ts";
@@ -18,6 +19,7 @@ const productInput = { name: 'Arroz <img src="https://example.invalid/x"> & "esp
 const buyerInput = { name: "Comprador <script>alert('x')</script>", documentType: "CC", documentNumber: "00123", email: "pruebas@example.invalid" };
 
 function seed(database) {
+  seedOpenCashSession(database);
   const catalog = new CatalogService(database);
   const clients = new ClientsService(database);
   const sales = new SalesService(database);
@@ -26,6 +28,16 @@ function seed(database) {
   const sale = sales.createSale({ clientId: buyer.id, items: [{ productId: product.id, quantity: "1" }],
     payment: { method: "cash", amountPaidCop: "9007199254741000" } });
   return { catalog, clients, sales, product, buyer, sale };
+}
+
+function seedOpenCashSession(database) {
+  const id = "00000000-0000-4000-8000-000000000007";
+  const now = "2026-01-01T00:00:00.000Z";
+  database.prepare(`
+    INSERT INTO pos_users (id, username, password_salt, password_hash, role, active, created_at, updated_at)
+    VALUES (?, 'testcash', ?, ?, 'admin', 1, ?, ?)
+  `).run(id, "a".repeat(32), "b".repeat(128), now, now);
+  new CashService(database).openSession({ openingCashCop: "0" }, id);
 }
 
 function snapshot(database) {

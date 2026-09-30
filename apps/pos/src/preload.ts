@@ -3,6 +3,7 @@ import { CATALOG_CHANNELS, type CatalogBridge } from "./catalogBridge";
 import { CLIENTS_CHANNELS, type ClientsBridge } from "./clientsBridge";
 import { SALES_CHANNELS, type SalesBridge } from "./salesBridge";
 import { AUTH_CHANNELS, type AuthBridge } from "./authBridge";
+import { CASH_CHANNELS, type CashBridge } from "./cashBridge";
 
 const catalog: CatalogBridge = {
   searchProductsForSale: (query) => ipcRenderer.invoke(CATALOG_CHANNELS.searchProductsForSale, query),
@@ -40,4 +41,11 @@ const auth: AuthBridge = {
   setUserActive: (id, active) => ipcRenderer.invoke(AUTH_CHANNELS.setUserActive, id, { active })
 };
 
-contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, auth, catalog, sales, clients });
+const cash: CashBridge = {
+  availability: () => ipcRenderer.invoke(CASH_CHANNELS.availability),
+  overview: () => ipcRenderer.invoke(CASH_CHANNELS.overview),
+  open: (input) => ipcRenderer.invoke(CASH_CHANNELS.open, input),
+  close: (input) => ipcRenderer.invoke(CASH_CHANNELS.close, input)
+};
+
+contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, auth, catalog, sales, clients, cash });

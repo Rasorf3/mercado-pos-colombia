@@ -17,6 +17,7 @@ export function SaleDetail({ sale, onClose }: { sale: Sale; onClose: () => void 
       <p className="sale-internal-id"><strong>Identificador interno:</strong> {sale.id}</p>
       <p><strong>Fecha:</strong> {saleDate(sale.createdAt)} (Colombia, UTC−5)</p>
       <p><strong>Registró:</strong> {sale.createdByUsername ?? "Usuario histórico no identificado"}</p>
+      <p><strong>Turno de caja:</strong> {sale.cashSessionId ? sale.cashSessionId.slice(0, 8) : "Venta histórica anterior al control de turnos"}</p>
       <p>Datos e importes conservados al registrar la venta.</p>
       <div className="table-scroll"><table className="sale-detail-table">
         <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th>Descuento</th><th>Importe guardado</th></tr></thead>
