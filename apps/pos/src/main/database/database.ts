@@ -9,6 +9,7 @@ import { PRODUCT_PACKAGE_WEIGHT_MIGRATION } from "./migrations/005_product_packa
 import { CATALOG_AND_SALE_DISCOUNTS_MIGRATION } from "./migrations/006_catalog_and_sale_discounts.ts";
 import { CASH_SESSIONS_MIGRATION } from "./migrations/007_cash_sessions.ts";
 import { CLIENT_CREDIT_MIGRATION } from "./migrations/008_client_credit.ts";
+import { COMPANY_PROFILE_MIGRATION } from "./migrations/009_company_profile.ts";
 
 const MIGRATIONS = [
   INITIAL_CATALOG_MIGRATION,
@@ -18,7 +19,8 @@ const MIGRATIONS = [
   PRODUCT_PACKAGE_WEIGHT_MIGRATION,
   CATALOG_AND_SALE_DISCOUNTS_MIGRATION,
   CASH_SESSIONS_MIGRATION,
-  CLIENT_CREDIT_MIGRATION
+  CLIENT_CREDIT_MIGRATION,
+  COMPANY_PROFILE_MIGRATION
 ];
 
 export function openPosDatabase(filePath: string): Database.Database {

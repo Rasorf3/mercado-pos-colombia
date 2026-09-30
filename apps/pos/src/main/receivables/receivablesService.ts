@@ -102,7 +102,7 @@ export class ReceivablesService {
       const cashSession = this.database.prepare("SELECT id FROM cash_sessions WHERE status = 'open'")
         .get() as { id: string } | undefined;
       if (payment.method === "cash" && !cashSession) {
-        throw new Error("Para recibir un abono en efectivo debe haber una caja abierta.");
+        throw new Error("Abre un turno de caja antes de registrar un abono en efectivo.");
       }
       this.database.prepare(`
         INSERT INTO client_credit_entries (

@@ -27,6 +27,7 @@ Estado: primera implementación local. La API y la sincronización no usan esta 
 | Autorizar fiado por venta y registrar abonos | Todo | Sí | Sí | Sí |
 | Ampliar el límite de fiado del cliente | Todo | Sí | Sí | Sí |
 | Administrar cuentas | Todo | Sí | No | No |
+| Consultar y editar el perfil del comercio | Todo | Sí | No | No |
 | Apertura y cierre de caja / proveedores | Todo | Sí | Sí | No |
 
 La interfaz oculta secciones según el rol, pero esa ocultación no es la barrera de seguridad: cada handler IPC del proceso principal exige sesión y vuelve a comprobar el permiso. Se deniega por defecto; al agregar una capacidad futura se debe autorizar explícitamente a los roles ordinarios. AdminMaster queda reservado para las capacidades especiales que se definan después. La operación de venta guarda el UUID del usuario en la venta y en sus movimientos de salida; catálogo, movimientos y clientes guardan quién los creó o actualizó. Las ventas históricas previas a esta migración mantienen esos campos en `NULL`.
@@ -34,6 +35,8 @@ La interfaz oculta secciones según el rol, pero esa ocultación no es la barrer
 La sección Caja está disponible para Admin y EmpleadoJefe. En cada instalación solo puede existir un turno abierto; Empleado puede vender dentro del turno activo, pero no ve fondo, conteos ni diferencias y no puede abrir/cerrar. El efectivo esperado incluye los abonos recibidos en efectivo durante el turno.
 
 Admin puede crear cuentas **Admin**, **EmpleadoJefe** y **Empleado**. El rol **AdminMaster** no aparece entre las opciones y es rechazado también por el contrato y el servicio principal.
+
+La sección **Mi empresa** es visible para Admin; el proceso principal vuelve a exigir la capacidad `company:manage` al leer o guardar sus datos. AdminMaster la tendría si se aprovisiona en el futuro; EmpleadoJefe y Empleado no pueden invocar sus canales IPC. Los empleados mostrados allí son las cuentas locales administradas en **Usuarios**, no expedientes laborales. Nombre, NIT, dirección, teléfonos y correo del comercio viven solo en la SQLite local y no se verifican ni sincronizan.
 
 Empleado y EmpleadoJefe pueden acceder al flujo de venta y consultar productos mediante un resultado específico de venta que excluye el costo en esa consulta. Para escoger un comprador usan una búsqueda acotada a clientes activos. Una venta puede ser pagada normalmente o marcada expresamente como fiada; esta última exige un cliente activo y carga el total completo a su cuenta. Los tres roles que venden pueden consultar saldos y movimientos, registrar abonos y ampliar el límite de crédito. El límite parte en $300.000 COP, puede ajustarse por cliente y no puede bajar de su saldo actual. Cada cambio guarda el usuario responsable.
 

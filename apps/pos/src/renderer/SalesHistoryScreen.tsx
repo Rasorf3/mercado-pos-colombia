@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "
 import type { Sale, SalesListInput, SalesPage } from "@mercado-pos/contracts";
 import { paymentLabel, saleDate, saleMoney } from "../salesPresentation";
 import { SaleDetail } from "./SaleDetail";
+import { UserErrorNotice } from "./UserErrorNotice";
+import { userFacingError } from "./userFacingError";
 
 export function SalesHistoryScreen(): ReactElement {
   const [query, setQuery] = useState<SalesListInput>({ page: 1, pageSize: 20 });
@@ -22,7 +24,7 @@ export function SalesHistoryScreen(): ReactElement {
     void window.electronAPI.sales.listSales(query).then((page) => {
       if (current) setResult(page);
     }).catch((reason: unknown) => {
-      if (current) { setError(reason instanceof Error ? reason.message : "No se pudo leer el historial."); setResult(null); }
+      if (current) { setError(userFacingError(reason, "No se pudo leer el historial. Inténtalo de nuevo.")); setResult(null); }
     }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
   }, [query]);
@@ -67,7 +69,7 @@ export function SalesHistoryScreen(): ReactElement {
         </select></label>
       </form>
       <p className="history-note">Fechas inclusivas del calendario de Colombia (UTC−5). Facturación electrónica pendiente.</p>
-      {error && <p className="receipt-error" role="alert">{error}</p>}
+      {error && <UserErrorNotice message={error} />}
       {loading ? <p role="status">Cargando ventas…</p> : result?.sales.length ? <>
         <div className="table-scroll"><table className="history-table">
           <thead><tr><th>Identificador interno</th><th>Fecha (UTC−5)</th><th>Registró</th><th>Total</th><th>Método de pago</th><th>Estado</th><th>Detalle</th></tr></thead>

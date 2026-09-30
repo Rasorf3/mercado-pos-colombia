@@ -54,5 +54,5 @@ test("la migración de ventas conserva catálogo y movimientos de una base v1", 
     { type: "entry", saleId: null },
     { type: "initial", saleId: null }
   ]);
-  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 8n);
+  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 9n);
 });

@@ -3,6 +3,8 @@ import type { ClientCreditAccount, ClientCreditAccountSummary, PaymentMethod } f
 import { PAYMENT_METHOD_OPTIONS } from "@mercado-pos/contracts";
 import { normalizeCreditPayment } from "@mercado-pos/domain";
 import { CopIntegerInput } from "./CopIntegerInput";
+import { UserErrorNotice } from "./UserErrorNotice";
+import { userFacingError } from "./userFacingError";
 
 export function ReceivablesScreen(): ReactElement {
   const [query, setQuery] = useState("");
@@ -94,7 +96,7 @@ export function ReceivablesScreen(): ReactElement {
   return <section className="receivables-page" aria-labelledby="receivables-title">
     <div className="page-heading"><div><p className="eyebrow">Cartera · operación local</p><h1 id="receivables-title">Fiados y abonos</h1><p className="subheading">Consulta saldos pendientes y registra abonos sin conexión.</p></div></div>
     <div className="receivables-note"><strong>Registro interno</strong><span>Un fiado carga el total de la venta al cliente. Cada abono se registra aparte con su medio declarado; no se procesa ni verifica automáticamente.</span></div>
-    {error && <p className="form-error" role="alert">{error}</p>}
+    {error && <UserErrorNotice message={error} />}
     {message && <p className="receivable-success" role="status">{message}</p>}
     <div className="receivables-layout">
       <section className="receivables-list-panel" aria-label="Cuentas de clientes">
@@ -152,5 +154,5 @@ function formatDate(value: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Ocurrió un error con la cuenta por cobrar.";
+  return userFacingError(error, "No se pudo completar la operación de cartera. Inténtalo de nuevo.");
 }

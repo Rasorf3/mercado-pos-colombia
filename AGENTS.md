@@ -57,6 +57,7 @@ No cambies estas tecnologías ni agregues dependencias importantes sin explicar 
 - No expongas módulos completos de Electron o Node a la interfaz.
 - Valida frame, sesión, permiso, identificadores e inputs de cada IPC en el proceso principal; ocultar controles en React no es autorización.
 - Roles estables: `admin_master`, `admin`, `employee_manager` (EmpleadoJefe), `employee`. AdminMaster no tiene cuenta ni credencial integrada y no puede asignarse desde UI; Admin puede crear Admin, EmpleadoJefe y Empleado, no AdminMaster. Deniega por defecto capacidades nuevas y consulta `docs/users-and-roles.md`. Los roles que venden también pueden consultar cartera, fiar, registrar abonos y ampliar cupos; Admin y EmpleadoJefe administran caja, catálogo, inventario y clientes.
+- El perfil local del comercio requiere `company:manage`: solo Admin y AdminMaster pueden consultarlo o editarlo. Los empleados del apartado se obtienen de las cuentas de usuario existentes, sin duplicar datos laborales. Guardar NIT/DV no verifica ni habilita facturación; no se añaden a comprobantes históricos.
 - Contraseñas de 5 a 128 caracteres, hash `scrypt` con sal individual; no registres secretos en renderer o logs. La sesión es temporal y SQLite no está cifrada. No almacenes números de tarjeta, CVV/CVC, PIN o credenciales bancarias.
 - Al añadir operaciones a la API, valida entradas y verifica permisos en cada operación; el `/health` actual no autentica usuarios.
 - Al implementar varios comercios, aísla sus datos en cada consulta del servidor.

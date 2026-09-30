@@ -16,6 +16,7 @@ export type Capability =
   | "credit:read"
   | "credit:collect"
   | "users:manage"
+  | "company:manage"
   | "cash:close"
   | "suppliers:manage";
 
@@ -24,7 +25,7 @@ const ADMIN_CAPABILITIES: readonly Capability[] = [
   "inventory:read", "inventory:manage", "sales:create", "sales:history",
   "clients:read", "clients:lookup-for-sale", "clients:create", "clients:manage",
   "clients:credit-manage", "credit:read", "credit:collect",
-  "users:manage", "cash:close", "suppliers:manage"
+  "users:manage", "company:manage", "cash:close", "suppliers:manage"
 ];
 
 const ROLE_CAPABILITIES: Record<Exclude<UserRole, "admin_master">, readonly Capability[]> = {

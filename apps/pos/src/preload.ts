@@ -5,6 +5,7 @@ import { SALES_CHANNELS, type SalesBridge } from "./salesBridge";
 import { AUTH_CHANNELS, type AuthBridge } from "./authBridge";
 import { CASH_CHANNELS, type CashBridge } from "./cashBridge";
 import { RECEIVABLES_CHANNELS, type ReceivablesBridge } from "./receivablesBridge";
+import { COMPANY_CHANNELS, type CompanyBridge } from "./companyBridge";
 
 const catalog: CatalogBridge = {
   searchProductsForSale: (query) => ipcRenderer.invoke(CATALOG_CHANNELS.searchProductsForSale, query),
@@ -56,4 +57,9 @@ const receivables: ReceivablesBridge = {
   recordPayment: (input) => ipcRenderer.invoke(RECEIVABLES_CHANNELS.recordPayment, input)
 };
 
-contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, auth, catalog, sales, clients, cash, receivables });
+const company: CompanyBridge = {
+  get: () => ipcRenderer.invoke(COMPANY_CHANNELS.get),
+  save: (input) => ipcRenderer.invoke(COMPANY_CHANNELS.save, input)
+};
+
+contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, auth, catalog, sales, clients, cash, receivables, company });

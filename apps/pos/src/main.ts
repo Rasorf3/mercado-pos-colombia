@@ -15,6 +15,8 @@ import { CashService } from "./main/cash/cashService";
 import { registerCashIpc } from "./main/cash/cashIpc";
 import { ReceivablesService } from "./main/receivables/receivablesService";
 import { registerReceivablesIpc } from "./main/receivables/receivablesIpc";
+import { CompanyService } from "./main/company/companyService";
+import { registerCompanyIpc } from "./main/company/companyIpc";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -57,6 +59,7 @@ void app.whenReady().then(() => {
   registerCatalogIpc(new CatalogService(posDatabase), () => mainWindow, auth);
   registerClientsIpc(new ClientsService(posDatabase), () => mainWindow, auth);
   registerReceivablesIpc(new ReceivablesService(posDatabase), () => mainWindow, auth);
+  registerCompanyIpc(new CompanyService(posDatabase), () => mainWindow, auth);
   const sales = new SalesService(posDatabase);
   const receipts = new ReceiptService(sales, electronReceiptOutput(() => mainWindow));
   registerSalesIpc(sales, receipts, () => mainWindow, auth);

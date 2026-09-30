@@ -1,6 +1,8 @@
 import { useState, type FormEvent, type ReactElement } from "react";
 import type { CSSProperties } from "react";
 import type { AuthState, BootstrapAdminInput, LoginInput } from "@mercado-pos/contracts";
+import { UserErrorNotice } from "./UserErrorNotice";
+import { userFacingError } from "./userFacingError";
 
 export function LoginScreen({ needsBootstrap, onAuthenticated, fontScale }: {
   needsBootstrap: boolean;
@@ -26,7 +28,7 @@ export function LoginScreen({ needsBootstrap, onAuthenticated, fontScale }: {
       onAuthenticated({ needsBootstrap: false, user });
       setPassword("");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "No se pudo iniciar sesión.");
+      setError(userFacingError(reason, "No se pudo iniciar sesión. Inténtalo de nuevo."));
     } finally {
       setBusy(false);
     }
@@ -42,7 +44,7 @@ export function LoginScreen({ needsBootstrap, onAuthenticated, fontScale }: {
       <label className="field">Contraseña<input type="password" autoComplete={needsBootstrap ? "new-password" : "current-password"} minLength={needsBootstrap ? 5 : 1} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => setCapsLockActive(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLockActive(event.getModifierState("CapsLock"))} onBlur={() => setCapsLockActive(false)} /></label>
       {capsLockActive && <small className="caps-lock-warning" role="status">Bloq Mayús está activado.</small>}
       {needsBootstrap && <p className="auth-hint">Usa al menos 5 caracteres. La contraseña se guarda como hash seguro, nunca en texto legible.</p>}
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <UserErrorNotice message={error} title="No se pudo ingresar" />}
       <button className="primary-button auth-submit" disabled={busy}>{busy ? "Verificando…" : needsBootstrap ? "Crear Admin y continuar" : "Ingresar"}</button>
     </form>
   </main>;

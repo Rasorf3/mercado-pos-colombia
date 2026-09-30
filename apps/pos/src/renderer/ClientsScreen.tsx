@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent, type ReactElement } f
 import type { Client, ClientCreateInput, ClientUpdateInput } from "@mercado-pos/contracts";
 import { DEFAULT_CLIENT_CREDIT_LIMIT_COP } from "@mercado-pos/contracts";
 import { CopIntegerInput } from "./CopIntegerInput";
+import { userFacingError } from "./userFacingError";
 
 interface Draft {
   name: string;
@@ -176,7 +177,7 @@ function nullable(value: string): string | null {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Ocurrió un error al procesar el cliente.";
+  return userFacingError(error, "No se pudo completar la operación del cliente. Inténtalo de nuevo.");
 }
 
 function formatCop(value: string): string {

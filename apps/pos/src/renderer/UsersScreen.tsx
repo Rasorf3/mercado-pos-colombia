@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactElement } from "react";
 import type { AssignableUserRole, User, UserCreateInput } from "@mercado-pos/contracts";
 import { roleLabel } from "@mercado-pos/domain";
+import { userFacingError } from "./userFacingError";
 
 export function UsersScreen(): ReactElement {
   const [users, setUsers] = useState<User[]>([]);
@@ -74,5 +75,5 @@ function formatDate(value: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "No se pudo administrar el usuario.";
+  return userFacingError(error, "No se pudo administrar el usuario. Inténtalo de nuevo.");
 }

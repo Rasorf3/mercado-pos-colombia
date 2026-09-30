@@ -3,6 +3,8 @@ import type { CashOverview, CashSession } from "@mercado-pos/contracts";
 import { PAYMENT_METHOD_OPTIONS } from "@mercado-pos/contracts";
 import { parseCopInteger } from "@mercado-pos/domain";
 import { CopIntegerInput } from "./CopIntegerInput";
+import { UserErrorNotice } from "./UserErrorNotice";
+import { userFacingError } from "./userFacingError";
 
 export function CashScreen(): ReactElement {
   const [overview, setOverview] = useState<CashOverview | null>(null);
@@ -59,7 +61,7 @@ export function CashScreen(): ReactElement {
   };
 
   if (loading) return <main className="cash-page"><p role="status">Consultando los turnos de caja…</p></main>;
-  if (!overview) return <main className="cash-page"><div className="form-error" role="alert">{error || "No se pudo consultar la caja local."}</div></main>;
+  if (!overview) return <main className="cash-page"><UserErrorNotice message={error || "No se pudo consultar la caja local."} /></main>;
 
   const active = overview.activeSession;
   const variancePreview = active ? calculateVariance(countedCashCop, active.expectedCashCop) : null;
@@ -74,7 +76,7 @@ export function CashScreen(): ReactElement {
       <span>Fondo inicial + ventas en efectivo netas del cambio + abonos de fiados recibidos en efectivo. En esta versión aún no se registran retiros ni otros ingresos manuales.</span>
     </div>
 
-    {error && <div className="cash-message error" role="alert">{error}</div>}
+    {error && <UserErrorNotice message={error} />}
     {message && <div className="cash-message success" role="status">{message}</div>}
 
     {active ? <>
@@ -183,5 +185,5 @@ function formatDate(value: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Ocurrió un error al procesar la caja local.";
+  return userFacingError(error, "No se pudo completar la operación de caja. Inténtalo de nuevo.");
 }

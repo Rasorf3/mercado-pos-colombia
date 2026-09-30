@@ -35,6 +35,7 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - `packages/contracts` contiene esquemas y tipos de frontera.
 - `packages/domain` aloja reglas puras de catálogo, inventario y ventas, sin acceso a interfaz o persistencia.
 - SQLite persiste catálogo, movimientos, clientes y sus datos de contacto, turnos de caja, ventas locales, instantáneas inmutables de comprador/productos, pagos de venta y un libro local de fiados/abonos en el directorio de Electron, fuera del repositorio.
+- SQLite también guarda un perfil único del comercio (migración v9) con identidad y contacto opcionales. Solo Admin/AdminMaster pueden leerlo o modificarlo mediante IPC autorizado. La lista de empleados del apartado usa las cuentas locales existentes, sin crear fichas duplicadas. El perfil no se integra aún en comprobantes, facturación o sincronización.
 - Para productos registrados por unidad se puede definir un peso opcional por empaque en g, kg o lb. El stock y los movimientos permanecen en unidades; la interfaz muestra el equivalente calculado con aritmética entera.
 - El renderer llama operaciones explícitas de catálogo y ventas por `preload`; solo el proceso principal accede a SQLite.
 - El costo y precio se guardan como enteros COP. Las cantidades se guardan en milésimas enteras (1 unidad = 1000 milésimas) y se convierten a texto decimal en las fronteras.
@@ -50,7 +51,7 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - Los métodos se persisten con IDs estables (`cash`, `debit_card`, `credit_card`, `bank_transfer`, `nequi`, `daviplata`, `bre_b`); la UI presenta etiquetas en español.
 - Un código de barras no puede repetirse. El código interno no es único en este alcance; solo se exige unicidad al código de barras.
 - El acceso al POS exige sesión local. Auth, contratos y permisos atraviesan React → preload → IPC → proceso principal; contraseñas se derivan con `scrypt` y permisos se vuelven a validar en cada operación protegida.
-- Las migraciones v4-v8 crean cuentas/roles y atribución, peso por empaque, promociones/descuentos, sesiones de caja y cartera local. La migración v8 agrega teléfono/dirección, cupo inicial de $300.000 COP, tipo de liquidación (`paid` para ventas previas), libro inmutable de cargos/abonos y desglose de abonos en caja. Datos históricos conservan actores ausentes como `NULL`, sin cupo adeudado y sin asociación a turnos anteriores.
+- Las migraciones v4-v9 crean cuentas/roles y atribución, peso por empaque, promociones/descuentos, sesiones de caja, cartera local y perfil del comercio. La migración v8 agrega teléfono/dirección, cupo inicial de $300.000 COP, tipo de liquidación (`paid` para ventas previas), libro inmutable de cargos/abonos y desglose de abonos en caja. La v9 crea el perfil vacío sin inventar NIT ni otros datos. Datos históricos conservan actores ausentes como `NULL`, sin cupo adeudado y sin asociación a turnos anteriores.
 - El historial de ventas y la ficha de producto muestran el nombre de quien registró la venta, creó el producto o realizó cada movimiento de stock. Admin puede asignar Admin, EmpleadoJefe o Empleado; AdminMaster sigue reservado.
 - AdminMaster no se asigna ni aprovisiona desde la interfaz. Su identidad está reservada, sin contraseña compartida ni puerta trasera distribuida.
 

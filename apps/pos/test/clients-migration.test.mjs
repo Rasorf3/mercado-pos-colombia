@@ -32,7 +32,8 @@ test("las migraciones actuales conservan ventas antiguas sin turno y agregan pes
     rmSync(directory, { recursive: true, force: true });
   });
 
-  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 8n);
+  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 9n);
+  assert.equal(upgraded.prepare("SELECT count(*) AS total FROM company_profile").get().total, 0n);
   assert.equal(upgraded.prepare("SELECT created_by_user_id FROM sales WHERE id = ?").get(saleId).created_by_user_id, null);
   assert.equal(upgraded.prepare("SELECT cash_session_id FROM sales WHERE id = ?").get(saleId).cash_session_id, null);
   assert.deepEqual(upgraded.prepare(`

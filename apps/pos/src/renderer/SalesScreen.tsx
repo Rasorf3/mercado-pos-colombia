@@ -5,6 +5,7 @@ import { ReceiptActions } from "./ReceiptActions";
 import { SaleDetail } from "./SaleDetail";
 import { QuickClientCreateForm } from "./QuickClientCreateForm";
 import { CopIntegerInput } from "./CopIntegerInput";
+import { userFacingError } from "./userFacingError";
 import {
   addSaleQuantity,
   calculateSaleAmounts,
@@ -546,5 +547,5 @@ function formatDate(value: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Ocurrió un error al procesar la operación local.";
+  return userFacingError(error, "No se pudo completar la operación de venta. Inténtalo de nuevo.");
 }
