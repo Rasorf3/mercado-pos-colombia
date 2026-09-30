@@ -11,11 +11,11 @@ Estado: primera versión funcional, offline y limitada a una caja por instalaci�
 
 ## Cálculo y relación con ventas
 
-`efectivo esperado = fondo inicial + pagos en efectivo aplicados`
+`efectivo esperado = fondo inicial + pagos en efectivo netos de cambio + abonos en efectivo recibidos`
 
-Para pagos en efectivo, el valor aplicado se obtiene del pago guardado como `amount_paid_cop - change_cop`. Los pagos con tarjeta, transferencias, Nequi, DaviPlata y Bre-B se muestran en el resumen por medio de pago, pero no incrementan el efectivo esperado.
+Para ventas en efectivo, el valor aplicado se obtiene del pago guardado como `amount_paid_cop - change_cop`. Los abonos se guardan en el libro de cartera y, si se reciben con una caja abierta, se vinculan al turno. El resumen distingue su total y los montos por medio; solo los abonos declarados en efectivo incrementan el efectivo esperado. Los abonos no monetarios no lo incrementan. Un abono en efectivo requiere turno abierto; abonos no monetarios pueden registrarse sin turno y, por tanto, no forman parte de un cierre.
 
-Cada venta nueva exige que haya un turno abierto y guarda su `cash_session_id` dentro de la misma transacción SQLite que registra venta, líneas, pago, movimientos y descuento de inventario. Si el turno se cierra o falta, la venta no se guarda ni se descuenta inventario. Al cerrarse el turno, se congela una instantánea del fondo, esperado, conteo real, diferencia, número/total de ventas, efectivo y totales por medio de pago. Las ventas del turno no se editan para corregir una diferencia.
+Cada venta nueva exige que haya un turno abierto y guarda su `cash_session_id` dentro de la misma transacción SQLite que registra venta, líneas, pago o cargo por fiado, movimientos y descuento de inventario. Si el turno se cierra o falta, la venta no se guarda ni se descuenta inventario. Al cerrarse el turno, se congela una instantánea del fondo, esperado, conteo real, diferencia, número/total de ventas, efectivo, pagos de venta y abonos por medio de pago. Las ventas y los abonos del turno no se editan para corregir una diferencia.
 
 Las ventas preexistentes a la migración 7 conservan `cash_session_id = NULL`; no se atribuyen a un turno nuevo ni se suman retroactivamente a la apertura.
 
@@ -28,7 +28,7 @@ Las ventas preexistentes a la migración 7 conservan `cash_session_id = NULL`; n
 
 ## Integridad y seguridad
 
-- La migración SQLite 7 crea sesiones y totales inmutables de cierre, restringe a un solo turno abierto y asocia las ventas nuevas mediante clave foránea.
+- Las migraciones SQLite 7 y 8 crean sesiones y totales inmutables de cierre, restringen a un solo turno abierto, asocian las ventas nuevas mediante clave foránea y agregan instantáneas inmutables de abonos asociados al turno.
 - Las operaciones se exponen por funciones explícitas de preload. El proceso principal valida el frame IPC, sesión, capacidad del rol, contratos y montos; el renderer no accede a SQLite.
-- El cierre y la escritura del desglose por método ocurren en una única transacción. Si falla cualquier parte, el turno permanece abierto y se puede reintentar sin cierre parcial.
+- El cierre y la escritura de los desgloses de pagos de venta y abonos ocurren en una única transacción. Si falla cualquier parte, el turno permanece abierto y se puede reintentar sin cierre parcial.
 - El saldo esperado, los totales y la diferencia se calculan con enteros exactos. La diferencia se conserva como texto decimal firmado en los contratos.

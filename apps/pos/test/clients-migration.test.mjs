@@ -32,19 +32,24 @@ test("las migraciones actuales conservan ventas antiguas sin turno y agregan pes
     rmSync(directory, { recursive: true, force: true });
   });
 
-  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 7n);
+  assert.equal(upgraded.prepare("SELECT max(version) AS version FROM schema_migrations").get().version, 8n);
   assert.equal(upgraded.prepare("SELECT created_by_user_id FROM sales WHERE id = ?").get(saleId).created_by_user_id, null);
   assert.equal(upgraded.prepare("SELECT cash_session_id FROM sales WHERE id = ?").get(saleId).cash_session_id, null);
   assert.deepEqual(upgraded.prepare(`
-    SELECT client_id, buyer_name, document_type, document_number, email
+    SELECT client_id, buyer_name, document_type, document_number, email, phone, address
     FROM sale_buyer_snapshots WHERE sale_id = ?
   `).get(saleId), {
     client_id: null,
     buyer_name: null,
     document_type: null,
     document_number: null,
-    email: null
+    email: null,
+    phone: null,
+    address: null
   });
+  assert.equal(upgraded.prepare("SELECT settlement_type FROM sales WHERE id = ?").get(saleId).settlement_type, "paid");
+  assert.equal(upgraded.prepare("SELECT credit_limit_cop FROM clients LIMIT 0").columns()[0].name, "credit_limit_cop");
+  assert.equal(upgraded.prepare("SELECT credit_payments_cop FROM cash_sessions LIMIT 0").columns()[0].name, "credit_payments_cop");
   assert.deepEqual(upgraded.prepare("SELECT weight_per_unit_milli, weight_unit FROM products LIMIT 0").columns()
     .map(({ name }) => name), ["weight_per_unit_milli", "weight_unit"]);
   assert.deepEqual(upgraded.prepare("SELECT promotion_discount_type, promotion_discount_value, promotion_starts_on, promotion_ends_on FROM products LIMIT 0").columns()

@@ -10,7 +10,8 @@ export const SalesListSchema = Type.Object({
   page: Type.Integer({ minimum: 1, maximum: 1000000 }),
   pageSize: Type.Integer({ minimum: 1, maximum: 100 }),
   dateFrom: Type.Optional(CalendarDateSchema),
-  dateTo: Type.Optional(CalendarDateSchema)
+  dateTo: Type.Optional(CalendarDateSchema),
+  buyerQuery: Type.Optional(Type.String({ maxLength: 120 }))
 }, { additionalProperties: false });
 
 export const ReceiptLayoutSchema = Type.Object({

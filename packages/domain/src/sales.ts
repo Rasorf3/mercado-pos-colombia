@@ -40,6 +40,20 @@ export interface NormalizedSalePayment {
   authorizationCode: string | null;
 }
 
+export interface CreditPaymentDraft {
+  amountCop: string;
+  method: string;
+  reference?: string;
+  authorizationCode?: string;
+}
+
+export interface NormalizedCreditPayment {
+  amountCop: bigint;
+  method: PaymentMethodId;
+  reference: string | null;
+  authorizationCode: string | null;
+}
+
 export function calculateSaleAmounts(lines: SaleAmountLineInput[]): {
   lineTotalsCop: bigint[];
   lineDiscountsCop: bigint[];
@@ -183,11 +197,42 @@ export function normalizeSalePayment(
   };
 }
 
+export function normalizeCreditPayment(input: CreditPaymentDraft, balanceCop: bigint): NormalizedCreditPayment {
+  if (!PAYMENT_METHOD_IDS.some((method) => method === input.method)) {
+    throw new DomainValidationError("El método del abono no es válido.");
+  }
+  if (balanceCop <= 0n || balanceCop > MAX_SQLITE_INTEGER) {
+    throw new DomainValidationError("El cliente no tiene un saldo pendiente para abonar.");
+  }
+  const amountCop = parseCopInteger(input.amountCop);
+  if (amountCop === 0n) throw new DomainValidationError("El valor del abono debe ser mayor que cero.");
+  if (amountCop > balanceCop) throw new DomainValidationError("El abono no puede superar el saldo pendiente.");
+
+  const method = input.method as PaymentMethodId;
+  const transferMethod = method === "bank_transfer" || method === "nequi" || method === "daviplata" || method === "bre_b";
+  const cardMethod = method === "debit_card" || method === "credit_card";
+  const reference = normalizeOptionalReference(input.reference, "La referencia");
+  const authorizationCode = normalizeOptionalReference(input.authorizationCode, "El código de autorización", 64);
+  if (reference && !transferMethod) {
+    throw new DomainValidationError("La referencia solo aplica a transferencias, Nequi, DaviPlata o Bre-B.");
+  }
+  if (authorizationCode && !cardMethod) {
+    throw new DomainValidationError("El código de autorización solo aplica a pagos con tarjeta.");
+  }
+  if (authorizationCode && /^\d{3,4}$/.test(authorizationCode)) {
+    throw new DomainValidationError("No ingreses CVV ni PIN como código de autorización.");
+  }
+  return { amountCop, method, reference, authorizationCode };
+}
+
 function normalizeOptionalReference(value: string | undefined, label: string, maxLength = 120): string | null {
   const normalized = value?.trim() ?? "";
   if (!normalized) return null;
   if (normalized.length > maxLength) {
     throw new DomainValidationError(`${label} no puede superar ${maxLength} caracteres.`);
+  }
+  if (/\b(?:cvv|cvc|pin|contrase(?:ñ|n)a|password|clave\s+(?:bancaria|de acceso|de ingreso))\b/i.test(normalized)) {
+    throw new DomainValidationError(`${label} no puede contener claves, PIN ni datos de seguridad.`);
   }
   if (/\d{13,19}/.test(normalized.replace(/[\s-]/g, ""))) {
     throw new DomainValidationError(`${label} no puede contener un número de tarjeta.`);

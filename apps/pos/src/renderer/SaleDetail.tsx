@@ -29,16 +29,20 @@ export function SaleDetail({ sale, onClose }: { sale: Sale; onClose: () => void 
       <div className="sale-detail-summary">
         <section><h2>Pago registrado</h2>
           <p><strong>Total:</strong> {saleMoney(sale.totalCop)}</p>
-          <p><strong>Método:</strong> {paymentLabel(sale.payment.method)}</p>
-          <p><strong>Valor pagado:</strong> {saleMoney(sale.payment.amountPaidCop)}</p>
-          <p><strong>Cambio:</strong> {saleMoney(sale.payment.changeCop)}</p>
-          {sale.payment.reference && <p>Referencia: {sale.payment.reference}</p>}
-          {sale.payment.authorizationCode && <p>Autorización declarada: {sale.payment.authorizationCode}</p>}
+          {sale.payment ? <>
+            <p><strong>Método:</strong> {paymentLabel(sale.payment.method)}</p>
+            <p><strong>Valor pagado:</strong> {saleMoney(sale.payment.amountPaidCop)}</p>
+            <p><strong>Cambio:</strong> {saleMoney(sale.payment.changeCop)}</p>
+            {sale.payment.reference && <p>Referencia: {sale.payment.reference}</p>}
+            {sale.payment.authorizationCode && <p>Autorización declarada: {sale.payment.authorizationCode}</p>}
+          </> : <p><strong>Liquidación:</strong> Fiado; total cargado al saldo del cliente.</p>}
         </section>
         <section><h2>Comprador de esta venta</h2>
           {sale.buyer ? <>
             <p>{sale.buyer.name}</p>
             {sale.buyer.documentType && <p>{sale.buyer.documentType}: {sale.buyer.documentNumber}</p>}
+            {sale.buyer.phone && <p>Teléfono: {sale.buyer.phone}</p>}
+            {sale.buyer.address && <p>Dirección: {sale.buyer.address}</p>}
             {sale.buyer.email && <p>{sale.buyer.email}</p>}
           </> : <p>Sin comprador asociado.</p>}
         </section>

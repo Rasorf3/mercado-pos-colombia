@@ -5,6 +5,7 @@ import {
   addSaleQuantity,
   calculateSaleAmounts,
   combineSaleQuantities,
+  normalizeCreditPayment,
   normalizeSalePayment
 } from "../dist/sales.js";
 
@@ -29,6 +30,20 @@ test("métodos de pago tienen identificadores estables y se validan", () => {
   assert.throws(() => normalizeSalePayment({ method: "cash", amountPaidCop: "1000", reference: "ref" }, 1000n), /solo aplica/);
   assert.throws(() => normalizeSalePayment({ method: "credit_card", amountPaidCop: "1000", authorizationCode: "123" }, 1000n), /CVV ni PIN/);
   assert.throws(() => normalizeSalePayment({ method: "bank_transfer", amountPaidCop: "1000", reference: "4111111111111111" }, 1000n), /número de tarjeta/);
+});
+
+test("los abonos deben reducir el saldo, usar un medio permitido y no guardar datos sensibles", () => {
+  assert.deepEqual(normalizeCreditPayment({ amountCop: "2500", method: "cash" }, 3000n), {
+    amountCop: 2500n, method: "cash", reference: null, authorizationCode: null
+  });
+  assert.deepEqual(normalizeCreditPayment({ amountCop: "1000", method: "nequi", reference: "TRX-123" }, 3000n), {
+    amountCop: 1000n, method: "nequi", reference: "TRX-123", authorizationCode: null
+  });
+  assert.throws(() => normalizeCreditPayment({ amountCop: "0", method: "cash" }, 3000n), /mayor que cero/);
+  assert.throws(() => normalizeCreditPayment({ amountCop: "3001", method: "cash" }, 3000n), /no puede superar/);
+  assert.throws(() => normalizeCreditPayment({ amountCop: "1000", method: "unknown" }, 3000n), /no es válido/);
+  assert.throws(() => normalizeCreditPayment({ amountCop: "1000", method: "bank_transfer", reference: "mi clave bancaria" }, 3000n), /claves/);
+  assert.throws(() => normalizeCreditPayment({ amountCop: "1000", method: "credit_card", authorizationCode: "123" }, 3000n), /CVV ni PIN/);
 });
 
 test("totales COP son exactos y redondean cada línea half-up al peso", () => {

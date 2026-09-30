@@ -26,13 +26,16 @@ test("el resumen registra el conteo, una diferencia firmada y totales por métod
     salesCount: 2,
     totalSalesCop: "45000",
     cashSalesCop: "30000",
+    creditPaymentsCop: "2000",
+    cashCreditPaymentsCop: "500",
     expectedCashCop: "55000",
     countedCashCop: "54900",
     varianceCashCop: "-100",
     paymentTotals: [
       { method: "cash", amountCop: "30000", salesCount: 1 },
       { method: "nequi", amountCop: "15000", salesCount: 1 }
-    ]
+    ],
+    creditPaymentTotals: [{ method: "cash", amountCop: "2000", paymentsCount: 1 }]
   };
   assert.equal(Value.Check(CashOverviewSchema, { activeSession: null, recentSessions: [closed] }), true);
   assert.equal(Value.Check(CashOverviewSchema, { activeSession: null, recentSessions: [{ ...closed, varianceCashCop: "100 COP" }] }), false);

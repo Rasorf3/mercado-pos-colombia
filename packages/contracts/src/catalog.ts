@@ -161,6 +161,7 @@ export const PaymentMethodSchema = Type.Union([
 ]);
 
 export const SaleStatusSchema = Type.Literal("local_pending_invoice");
+export const SaleSettlementSchema = Type.Union([Type.Literal("paid"), Type.Literal("on_account")]);
 
 export const SaleLineInputSchema = Type.Object({
   productId: UuidSchema,
@@ -177,7 +178,8 @@ export const SalePaymentInputSchema = Type.Object({
 
 export const SaleCreateSchema = Type.Object({
   items: Type.Array(SaleLineInputSchema, { minItems: 1, maxItems: 100 }),
-  payment: SalePaymentInputSchema,
+  settlement: Type.Optional(SaleSettlementSchema),
+  payment: Type.Optional(SalePaymentInputSchema),
   clientId: Type.Optional(ClientIdSchema)
 }, { additionalProperties: false });
 
@@ -204,10 +206,11 @@ export const SaleSchema = Type.Object({
   id: UuidSchema,
   cashSessionId: Type.Union([UuidSchema, Type.Null()]),
   status: SaleStatusSchema,
+  settlement: SaleSettlementSchema,
   totalCop: CopIntegerSchema,
   createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
   items: Type.Array(SaleLineSchema, { minItems: 1, maxItems: 100 }),
-  payment: SalePaymentSchema,
+  payment: Type.Union([SalePaymentSchema, Type.Null()]),
   buyer: Type.Union([BuyerSnapshotSchema, Type.Null()]),
   createdAt: Type.String({ format: "date-time" })
 }, { additionalProperties: false });
@@ -216,9 +219,10 @@ export const SaleSummarySchema = Type.Object({
   id: UuidSchema,
   cashSessionId: Type.Union([UuidSchema, Type.Null()]),
   status: SaleStatusSchema,
+  settlement: SaleSettlementSchema,
   totalCop: CopIntegerSchema,
   createdByUsername: Type.Union([Type.String({ minLength: 3, maxLength: 64 }), Type.Null()]),
-  payment: SalePaymentSchema,
+  payment: Type.Union([SalePaymentSchema, Type.Null()]),
   buyer: Type.Union([BuyerSnapshotSchema, Type.Null()]),
   createdAt: Type.String({ format: "date-time" })
 }, { additionalProperties: false });
@@ -238,6 +242,7 @@ export type InventoryAdjustmentInput = Static<typeof InventoryAdjustmentSchema>;
 export type InventoryMovement = Static<typeof InventoryMovementSchema>;
 export type PaymentMethod = Static<typeof PaymentMethodSchema>;
 export type SaleStatus = Static<typeof SaleStatusSchema>;
+export type SaleSettlement = Static<typeof SaleSettlementSchema>;
 export type { BuyerSnapshot } from "./clients.js";
 export type SaleLineInput = Static<typeof SaleLineInputSchema>;
 export type SalePaymentInput = Static<typeof SalePaymentInputSchema>;

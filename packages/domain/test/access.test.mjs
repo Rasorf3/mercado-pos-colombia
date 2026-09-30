@@ -18,5 +18,11 @@ test("roles only receive their explicitly assigned capabilities", () => {
   assert.equal(roleCan("employee", "sales:history"), false);
   assert.equal(roleCan("employee", "clients:create"), true);
   assert.equal(roleCan("employee", "clients:manage"), false);
+  for (const role of ["admin", "employee_manager", "employee"]) {
+    assert.equal(roleCan(role, "credit:read"), true);
+    assert.equal(roleCan(role, "credit:collect"), true);
+    assert.equal(roleCan(role, "clients:credit-manage"), true);
+  }
+  assert.equal(roleCan("admin_master", "credit:collect"), true);
   assert.equal(roleCan("admin_master", "users:manage"), true);
 });

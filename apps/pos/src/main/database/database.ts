@@ -8,6 +8,7 @@ import { USERS_AND_ROLES_MIGRATION } from "./migrations/004_users_and_roles.ts";
 import { PRODUCT_PACKAGE_WEIGHT_MIGRATION } from "./migrations/005_product_package_weight.ts";
 import { CATALOG_AND_SALE_DISCOUNTS_MIGRATION } from "./migrations/006_catalog_and_sale_discounts.ts";
 import { CASH_SESSIONS_MIGRATION } from "./migrations/007_cash_sessions.ts";
+import { CLIENT_CREDIT_MIGRATION } from "./migrations/008_client_credit.ts";
 
 const MIGRATIONS = [
   INITIAL_CATALOG_MIGRATION,
@@ -16,7 +17,8 @@ const MIGRATIONS = [
   USERS_AND_ROLES_MIGRATION,
   PRODUCT_PACKAGE_WEIGHT_MIGRATION,
   CATALOG_AND_SALE_DISCOUNTS_MIGRATION,
-  CASH_SESSIONS_MIGRATION
+  CASH_SESSIONS_MIGRATION,
+  CLIENT_CREDIT_MIGRATION
 ];
 
 export function openPosDatabase(filePath: string): Database.Database {

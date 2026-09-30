@@ -1,5 +1,8 @@
 import { Type, type Static } from "@sinclair/typebox";
 
+export const DEFAULT_CLIENT_CREDIT_LIMIT_COP = "300000";
+export const ClientCreditLimitSchema = Type.String({ pattern: "^\\d+$", maxLength: 19 });
+
 export const ClientIdSchema = Type.String({
   pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 });
@@ -11,7 +14,10 @@ const ClientFields = {
   email: Type.Union([
     Type.String({ minLength: 3, maxLength: 254, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" }),
     Type.Null()
-  ])
+  ]),
+  phone: Type.Optional(Type.Union([Type.String({ minLength: 1, maxLength: 32 }), Type.Null()])),
+  address: Type.Optional(Type.Union([Type.String({ minLength: 1, maxLength: 240 }), Type.Null()])),
+  creditLimitCop: Type.Optional(ClientCreditLimitSchema)
 };
 
 export const ClientCreateSchema = Type.Object(ClientFields, { additionalProperties: false });
@@ -24,6 +30,10 @@ export const ClientUpdateSchema = Type.Object({
 export const ClientSchema = Type.Object({
   id: ClientIdSchema,
   ...ClientFields,
+  phone: Type.Union([Type.String({ maxLength: 32 }), Type.Null()]),
+  address: Type.Union([Type.String({ maxLength: 240 }), Type.Null()]),
+  creditLimitCop: ClientCreditLimitSchema,
+  creditBalanceCop: ClientCreditLimitSchema,
   active: Type.Boolean(),
   createdAt: Type.String({ format: "date-time" }),
   updatedAt: Type.String({ format: "date-time" })
@@ -41,7 +51,11 @@ export const SaleClientMatchSchema = Type.Object({
   name: Type.String({ minLength: 1, maxLength: 120 }),
   documentType: Type.Union([Type.String({ maxLength: 32 }), Type.Null()]),
   documentNumber: Type.Union([Type.String({ maxLength: 64 }), Type.Null()]),
-  email: Type.Union([Type.String({ maxLength: 254 }), Type.Null()])
+  email: Type.Union([Type.String({ maxLength: 254 }), Type.Null()]),
+  phone: Type.Union([Type.String({ maxLength: 32 }), Type.Null()]),
+  address: Type.Union([Type.String({ maxLength: 240 }), Type.Null()]),
+  creditLimitCop: ClientCreditLimitSchema,
+  creditBalanceCop: ClientCreditLimitSchema
 }, { additionalProperties: false });
 
 export const BuyerSnapshotSchema = Type.Object({
@@ -49,7 +63,13 @@ export const BuyerSnapshotSchema = Type.Object({
   name: Type.String({ minLength: 1, maxLength: 120 }),
   documentType: Type.Union([Type.String({ maxLength: 32 }), Type.Null()]),
   documentNumber: Type.Union([Type.String({ maxLength: 64 }), Type.Null()]),
-  email: Type.Union([Type.String({ maxLength: 254 }), Type.Null()])
+  email: Type.Union([Type.String({ maxLength: 254 }), Type.Null()]),
+  phone: Type.Union([Type.String({ maxLength: 32 }), Type.Null()]),
+  address: Type.Union([Type.String({ maxLength: 240 }), Type.Null()])
+}, { additionalProperties: false });
+
+export const ClientCreditLimitUpdateSchema = Type.Object({
+  creditLimitCop: ClientCreditLimitSchema
 }, { additionalProperties: false });
 
 export type ClientCreateInput = Static<typeof ClientCreateSchema>;
@@ -59,3 +79,4 @@ export type ClientSearchInput = Static<typeof ClientSearchSchema>;
 export type SaleClientSearchInput = Static<typeof SaleClientSearchSchema>;
 export type SaleClientMatch = Static<typeof SaleClientMatchSchema>;
 export type BuyerSnapshot = Static<typeof BuyerSnapshotSchema>;
+export type ClientCreditLimitUpdate = Static<typeof ClientCreditLimitUpdateSchema>;

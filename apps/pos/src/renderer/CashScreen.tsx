@@ -71,7 +71,7 @@ export function CashScreen(): ReactElement {
 
     <div className="cash-control-note" role="note">
       <strong>Cómo se calcula el efectivo esperado</strong>
-      <span>Fondo inicial + ventas en efectivo netas del cambio. En esta versión aún no se registran retiros ni ingresos manuales de efectivo.</span>
+      <span>Fondo inicial + ventas en efectivo netas del cambio + abonos de fiados recibidos en efectivo. En esta versión aún no se registran retiros ni otros ingresos manuales.</span>
     </div>
 
     {error && <div className="cash-message error" role="alert">{error}</div>}
@@ -84,9 +84,11 @@ export function CashScreen(): ReactElement {
           <CashMetric label="Fondo inicial" amount={active.openingCashCop} />
           <CashMetric label="Ventas registradas" amount={active.totalSalesCop} detail={`${active.salesCount} ${active.salesCount === 1 ? "venta" : "ventas"}`} />
           <CashMetric label="Ventas en efectivo" amount={active.cashSalesCop} />
+          <CashMetric label="Abonos recibidos" amount={active.creditPaymentsCop} detail={`En efectivo: ${formatCop(active.cashCreditPaymentsCop)}`} />
           <CashMetric label="Efectivo esperado" amount={active.expectedCashCop} emphasis />
         </div>
         <PaymentTotals session={active} />
+        <CreditPaymentTotals session={active} />
       </section>
 
       <form className="cash-panel cash-close-form" onSubmit={(event) => void closeSession(event)}>
@@ -130,6 +132,12 @@ function PaymentTotals({ session }: { session: CashSession }): ReactElement {
   </div>;
 }
 
+function CreditPaymentTotals({ session }: { session: CashSession }): ReactElement {
+  return <div className="cash-payment-breakdown"><h3>Abonos de fiados por medio de pago</h3>
+    {session.creditPaymentTotals.length === 0 ? <p className="cash-muted">Aún no hay abonos asociados a este turno.</p> : <ul>{session.creditPaymentTotals.map((payment) => <li key={payment.method}><span>{paymentLabel(payment.method)} · {payment.paymentsCount} {payment.paymentsCount === 1 ? "abono" : "abonos"}</span><strong>{formatCop(payment.amountCop)}</strong></li>)}</ul>}
+  </div>;
+}
+
 function ClosedSession({ session }: { session: CashSession }): ReactElement {
   const variance = BigInt(session.varianceCashCop ?? "0");
   return <article className="cash-history-entry">
@@ -137,11 +145,13 @@ function ClosedSession({ session }: { session: CashSession }): ReactElement {
     <div className="cash-history-values">
       <span>Fondo inicial <strong>{formatCop(session.openingCashCop)}</strong></span>
       <span>Ventas <strong>{session.salesCount} · {formatCop(session.totalSalesCop)}</strong></span>
+      <span>Abonos recibidos <strong>{formatCop(session.creditPaymentsCop)}</strong></span>
       <span>Efectivo esperado <strong>{formatCop(session.expectedCashCop)}</strong></span>
       <span>Efectivo contado <strong>{formatCop(session.countedCashCop ?? "0")}</strong></span>
       <span>Diferencia <strong className={variance === 0n ? "balanced" : variance > 0n ? "surplus" : "shortage"}>{signedCop(variance)}</strong></span>
     </div>
     <PaymentTotals session={session} />
+    <CreditPaymentTotals session={session} />
     <small className="cash-muted">Cerró {session.closedByUsername ?? "usuario no identificado"} · {session.closedAt ? formatDate(session.closedAt) : "fecha no registrada"}</small>
   </article>;
 }

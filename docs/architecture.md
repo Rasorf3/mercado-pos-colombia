@@ -10,7 +10,7 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 │ Electron main + preload      │
 │ React renderer                │
 │ SQLite local                   │
-│ catálogo, stock, clientes, caja y ventas │
+│ catálogo, stock, clientes, caja, ventas y cartera │
 └──────────────┬───────────────┘
                │ contratos TypeBox
                ▼
@@ -34,7 +34,7 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - La API es un proceso independiente; la pantalla inicial no depende de que la API esté levantada.
 - `packages/contracts` contiene esquemas y tipos de frontera.
 - `packages/domain` aloja reglas puras de catálogo, inventario y ventas, sin acceso a interfaz o persistencia.
-- SQLite persiste catálogo, movimientos, clientes, turnos de caja, ventas locales, líneas congeladas, instantánea de comprador opcional y un pago por venta en el directorio local de Electron, fuera del repositorio.
+- SQLite persiste catálogo, movimientos, clientes y sus datos de contacto, turnos de caja, ventas locales, instantáneas inmutables de comprador/productos, pagos de venta y un libro local de fiados/abonos en el directorio de Electron, fuera del repositorio.
 - Para productos registrados por unidad se puede definir un peso opcional por empaque en g, kg o lb. El stock y los movimientos permanecen en unidades; la interfaz muestra el equivalente calculado con aritmética entera.
 - El renderer llama operaciones explícitas de catálogo y ventas por `preload`; solo el proceso principal accede a SQLite.
 - El costo y precio se guardan como enteros COP. Las cantidades se guardan en milésimas enteras (1 unidad = 1000 milésimas) y se convierten a texto decimal en las fronteras.
@@ -44,12 +44,13 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 - Cada venta conserva el tipo y valor efectivo del descuento y su importe por línea; editar después el precio o la promoción del producto no cambia el historial ni el comprobante.
 - Dinero y descuentos se calculan con `bigint`: primero se redondea el importe bruto de cada línea al COP más cercano (mitad hacia arriba); el descuento porcentual o fijo por unidad se calcula para la cantidad de esa línea y se redondea con la misma regla; el subtotal neto es bruto menos descuento. El total es la suma de subtotales netos. No se aplica ni se supone IVA.
 - Las ventas locales usan `local_pending_invoice`; este estado no afirma emisión, validación ni aceptación de la DIAN. No hay conexión fiscal ni procesamiento/verificación del pago.
-- `main/cash/CashService` mantiene un turno de caja abierto como máximo por instalación. Las ventas nuevas requieren ese turno y conservan su ID; cierre y desglose por método son una instantánea inmutable SQLite. El efectivo esperado es fondo inicial más ventas en efectivo netas de cambio. Empleado vende con caja abierta, pero solo Admin/EmpleadoJefe abren o cierran. Las ventas anteriores a la migración 7 quedan sin asociación.
-- Los perfiles locales guardan nombre/razón social, tipo y número de identificación y correo opcional; no se recopilan dirección o teléfono. Una venta puede no tener comprador y congela los datos del cliente seleccionado en una instantánea inmutable.
+- `main/cash/CashService` mantiene un turno de caja abierto como máximo por instalación. Las ventas nuevas requieren ese turno y conservan su ID; cierre y desglose por método son una instantánea inmutable SQLite. El efectivo esperado es fondo inicial + ventas en efectivo netas de cambio + abonos de fiados recibidos en efectivo. Los abonos recibidos durante un turno se desglosan aparte por medio. Empleado vende con caja abierta, pero solo Admin/EmpleadoJefe abren o cierran. Las ventas anteriores a la migración 7 quedan sin asociación.
+- Los perfiles locales guardan nombre/razón social, tipo y número de identificación, correo, teléfono y dirección opcionales y límite de fiado inicial de $300.000 COP. Una venta pagada puede no tener comprador; una venta fiada exige cliente activo y congela los datos de contacto que existían al vender.
+- `main/receivables/ReceivablesService` calcula el saldo del cliente desde un libro inmutable de cargos y abonos. Fiado, instantáneas, cargo y salidas de stock pertenecen a la transacción de venta. Saldo + venta no puede exceder el límite configurado; un abono no puede exceder el saldo. Todos los roles de venta —Admin, EmpleadoJefe y Empleado— pueden consultar cartera, fiar, abonar y ampliar cupo; AdminMaster mantiene todo.
 - Los métodos se persisten con IDs estables (`cash`, `debit_card`, `credit_card`, `bank_transfer`, `nequi`, `daviplata`, `bre_b`); la UI presenta etiquetas en español.
 - Un código de barras no puede repetirse. El código interno no es único en este alcance; solo se exige unicidad al código de barras.
 - El acceso al POS exige sesión local. Auth, contratos y permisos atraviesan React → preload → IPC → proceso principal; contraseñas se derivan con `scrypt` y permisos se vuelven a validar en cada operación protegida.
-- La migración v4 crea cuentas/roles y atribuye nuevas ventas, movimientos, altas y ediciones a un usuario; la v5 añade peso opcional por unidad sin alterar existencias históricas. Datos anteriores conservan su actor como `NULL` y peso no definido.
+- Las migraciones v4-v8 crean cuentas/roles y atribución, peso por empaque, promociones/descuentos, sesiones de caja y cartera local. La migración v8 agrega teléfono/dirección, cupo inicial de $300.000 COP, tipo de liquidación (`paid` para ventas previas), libro inmutable de cargos/abonos y desglose de abonos en caja. Datos históricos conservan actores ausentes como `NULL`, sin cupo adeudado y sin asociación a turnos anteriores.
 - El historial de ventas y la ficha de producto muestran el nombre de quien registró la venta, creó el producto o realizó cada movimiento de stock. Admin puede asignar Admin, EmpleadoJefe o Empleado; AdminMaster sigue reservado.
 - AdminMaster no se asigna ni aprovisiona desde la interfaz. Su identidad está reservada, sin contraseña compartida ni puerta trasera distribuida.
 
@@ -65,7 +66,7 @@ Ver [`local-sales-history-and-receipts.md`](local-sales-history-and-receipts.md)
 
 La matriz y los límites de autenticación se describen en [`users-and-roles.md`](users-and-roles.md).
 
-El alcance, la fórmula del saldo, las limitaciones y la operación de Caja se documentan en [`cash-opening-and-closing.md`](cash-opening-and-closing.md).
+El alcance, el libro de cargos/abonos y los límites de cartera se documentan en [`client-credit.md`](client-credit.md). La operación y conciliación de caja se documentan en [`cash-opening-and-closing.md`](cash-opening-and-closing.md).
 
 ## Evolución prevista
 

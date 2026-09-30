@@ -355,7 +355,7 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .cash-status-pill { flex: 0 0 auto; border-radius: 20px; padding: 5px 9px; font-size: calc(9px * var(--font-scale, 1)); font-weight: 700; }
 .cash-status-pill.open { color: #267247; background: #e8f5eb; }
 .cash-status-pill.closed { color: #6d7973; background: #eef1ef; }
-.cash-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.cash-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
 .cash-metric { min-width: 0; display: grid; gap: 6px; border: 1px solid #edf1ee; border-radius: 8px; padding: 12px; background: #fbfcfb; }
 .cash-metric > span { color: #798881; font-size: calc(9px * var(--font-scale, 1)); }
 .cash-metric > strong { overflow-wrap: anywhere; color: #354d43; font-size: calc(15px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; }
@@ -384,7 +384,7 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .cash-history-heading { align-items: center; }
 .cash-history-heading strong, .cash-history-heading span { display: block; }
 .cash-history-heading strong { color: #41594e; font-size: calc(11px * var(--font-scale, 1)); }
-.cash-history-values { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.cash-history-values { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .cash-history-values > span { display: grid; gap: 4px; color: #84918b; font-size: calc(8px * var(--font-scale, 1)); }
 .cash-history-values strong { overflow-wrap: anywhere; color: #4d6257; font-size: calc(10px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; }
 .cash-history-entry .cash-payment-breakdown { margin: 10px 0; }
@@ -400,6 +400,45 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
 .balanced { color: #28764a !important; }
 .surplus { color: #257052 !important; }
 .shortage { color: #a4483f !important; }
+.receivables-page { display: grid; gap: 14px; padding-bottom: 8px; }
+.receivables-page > .page-heading { padding-bottom: 0; }
+.receivables-note { display: grid; gap: 4px; border: 1px solid #dce9e0; border-radius: 8px; padding: 12px 14px; color: #577066; background: #f5faf6; font-size: calc(11px * var(--font-scale, 1)); line-height: 1.45; }
+.receivables-note strong { color: #3d614f; }
+.receivables-layout { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.4fr); gap: 14px; align-items: start; }
+.receivables-list-panel, .receivables-detail-panel { min-width: 0; border: 1px solid #e4ebe6; border-radius: 10px; padding: 15px; background: #fff; box-shadow: 0 3px 11px #1b302b06; }
+.receivables-list-panel > .field { display: grid; gap: 6px; color: #566b61; font-size: calc(10px * var(--font-scale, 1)); font-weight: 650; }
+.receivables-list-panel > .field input { min-height: 38px; border: 1px solid #dce7e1; border-radius: 6px; padding: 0 9px; font: inherit; background: white; }
+.receivable-account-list { display: grid; gap: 7px; max-height: 560px; overflow: auto; margin-top: 12px; }
+.receivable-account-card { display: flex; justify-content: space-between; gap: 10px; width: 100%; border: 1px solid #e8eeea; border-radius: 7px; padding: 10px; color: #4d6257; text-align: left; background: #fbfcfb; cursor: pointer; }
+.receivable-account-card.selected { border-color: #82b9a2; background: #f2faf4; }
+.receivable-account-card > span { display: grid; gap: 4px; min-width: 0; }
+.receivable-account-card strong { overflow-wrap: anywhere; font-size: calc(10px * var(--font-scale, 1)); }
+.receivable-account-card small, .receivable-contact { color: #84928c; font-size: calc(9px * var(--font-scale, 1)); }
+.receivable-account-card .receivable-balance { text-align: right; white-space: nowrap; }
+.receivable-account-card .receivable-balance strong { color: #9a6138; }
+.receivables-list-footnote { display: block; margin-top: 9px; color: #8a9791; font-size: calc(9px * var(--font-scale, 1)); }
+.receivable-detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.receivable-detail-heading .eyebrow, .receivable-detail-heading h2 { margin: 0 0 4px; }
+.receivable-detail-heading h2 { color: #304644; font-size: calc(17px * var(--font-scale, 1)); }
+.receivable-detail-heading > div > span { color: #84928c; font-size: calc(10px * var(--font-scale, 1)); }
+.receivable-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
+.receivable-totals > div { display: grid; gap: 5px; border: 1px solid #edf1ee; border-radius: 7px; padding: 10px; background: #fbfcfb; }
+.receivable-totals span { color: #84918b; font-size: calc(9px * var(--font-scale, 1)); }
+.receivable-totals strong { overflow-wrap: anywhere; color: #40594d; font-size: calc(13px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; }
+.receivable-payment-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; border: 1px solid #e4ebe6; border-radius: 8px; padding: 12px; background: #fbfcfb; }
+.receivable-payment-form h3 { grid-column: 1 / -1; margin: 0; color: #42594f; font-size: calc(12px * var(--font-scale, 1)); }
+.receivable-payment-form .field { display: grid; gap: 5px; color: #596d64; font-size: calc(9px * var(--font-scale, 1)); }
+.receivable-payment-form .field input, .receivable-payment-form .field select { min-width: 0; min-height: 35px; border: 1px solid #dce7e1; border-radius: 5px; padding: 0 8px; color: #304a3d; background: #fff; font: inherit; }
+.receivable-payment-form .primary-button, .receivable-payment-form > .form-error { grid-column: 1 / -1; }
+.receivable-ledger { margin-top: 18px; }
+.receivable-ledger h3 { margin: 0 0 8px; color: #556960; font-size: calc(11px * var(--font-scale, 1)); }
+.receivable-ledger ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.receivable-ledger li { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #eef2ef; padding: 9px 1px; color: #4c6257; font-size: calc(10px * var(--font-scale, 1)); }
+.receivable-ledger li > span { display: grid; gap: 4px; min-width: 0; }
+.receivable-ledger li small { color: #85928c; font-size: calc(9px * var(--font-scale, 1)); }
+.receivable-ledger li > strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.receivable-ledger .credit-payment-value { color: #28764a; }
+.receivable-success { border: 1px solid #d8eadc; border-radius: 7px; padding: 9px 12px; color: #36714d; background: #f4fbf5; font-size: calc(10px * var(--font-scale, 1)); }
 
 @media (max-width: 1050px) {
   .app-shell { padding: 0 24px 20px; }
@@ -452,4 +491,7 @@ td small { margin-top: 4px; color: #99a49f; font-size: calc(9px * var(--font-sca
   .cash-close-entry, .cash-open-entry { align-items: stretch; flex-direction: column; }
   .cash-close-entry > .primary-button, .cash-open-entry > .primary-button { width: 100%; }
   .cash-history-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .receivables-layout { grid-template-columns: 1fr; }
+  .receivable-totals { grid-template-columns: 1fr; }
+  .receivable-payment-form { grid-template-columns: 1fr; }
 }

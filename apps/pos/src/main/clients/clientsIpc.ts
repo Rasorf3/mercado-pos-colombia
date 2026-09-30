@@ -6,10 +6,11 @@ import {
   ClientCreateSchema,
   ClientIdSchema,
   ClientSearchSchema,
+  ClientCreditLimitUpdateSchema,
   SaleClientSearchSchema,
   ClientUpdateSchema
 } from "@mercado-pos/contracts";
-import type { ClientCreateInput, ClientSearchInput, ClientUpdateInput } from "@mercado-pos/contracts";
+import type { ClientCreateInput, ClientCreditLimitUpdate, ClientSearchInput, ClientUpdateInput } from "@mercado-pos/contracts";
 import { CLIENTS_CHANNELS } from "../../clientsBridge";
 import { ClientsService } from "./clientsService";
 import { AuthService } from "../auth/authService";
@@ -63,5 +64,11 @@ export function registerClientsIpc(
     validateInput<string>(ClientIdSchema, id);
     validateInput<ClientUpdateInput>(ClientUpdateSchema, input);
     return service.update(id, input, user.id);
+  });
+  handle(CLIENTS_CHANNELS.setCreditLimit, (_event, id, input) => {
+    const user = trustedSessionUser(auth, _event, getWindow(), "clients:credit-manage");
+    validateInput<string>(ClientIdSchema, id);
+    validateInput<ClientCreditLimitUpdate>(ClientCreditLimitUpdateSchema, input);
+    return service.setCreditLimit(id, input.creditLimitCop, user.id);
   });
 }

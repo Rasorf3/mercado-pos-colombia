@@ -7,12 +7,17 @@ test("normaliza los campos mínimos del comprador y conserva identificación com
     name: "  Tienda La Esquina  ",
     documentType: " nit ",
     documentNumber: " 000123456-7 ",
-    email: "  VENTAS@EJEMPLO.CO "
+    email: "  VENTAS@EJEMPLO.CO ",
+    phone: " +57 300 123 4567 ",
+    address: "  Calle 12 # 34-56  "
   }), {
     name: "Tienda La Esquina",
     documentType: "NIT",
     documentNumber: "000123456-7",
-    email: "ventas@ejemplo.co"
+    email: "ventas@ejemplo.co",
+    phone: "+57 300 123 4567",
+    address: "Calle 12 # 34-56",
+    creditLimitCop: "300000"
   });
 });
 

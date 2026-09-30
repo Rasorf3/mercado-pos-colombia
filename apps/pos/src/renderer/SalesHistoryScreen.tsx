@@ -7,6 +7,7 @@ export function SalesHistoryScreen(): ReactElement {
   const [query, setQuery] = useState<SalesListInput>({ page: 1, pageSize: 20 });
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [buyerQuery, setBuyerQuery] = useState("");
   const [result, setResult] = useState<SalesPage | null>(null);
   const [selected, setSelected] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,13 @@ export function SalesHistoryScreen(): ReactElement {
 
   const filter = (event: FormEvent) => {
     event.preventDefault();
-    setQuery({ page: 1, pageSize: query.pageSize, ...(from ? { dateFrom: from } : {}), ...(to ? { dateTo: to } : {}) });
+    setQuery({
+      page: 1,
+      pageSize: query.pageSize,
+      ...(from ? { dateFrom: from } : {}),
+      ...(to ? { dateTo: to } : {}),
+      ...(buyerQuery.trim() ? { buyerQuery: buyerQuery.trim() } : {})
+    });
   };
 
   if (selected) return <SaleDetail sale={selected} onClose={() => setSelected(null)} />;
@@ -52,8 +59,9 @@ export function SalesHistoryScreen(): ReactElement {
       <form className="history-filters" onSubmit={filter}>
         <label>Desde <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
         <label>Hasta <input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
+        <label>Cliente <input type="search" maxLength={120} value={buyerQuery} placeholder="Nombre, identificación o teléfono" onChange={(event) => setBuyerQuery(event.target.value)} /></label>
         <button type="submit" className="primary-button" disabled={loading}>Filtrar</button>
-        <button type="button" className="quiet-button" onClick={() => { setFrom(""); setTo(""); setQuery({ page: 1, pageSize: query.pageSize }); }}>Todas las fechas</button>
+        <button type="button" className="quiet-button" onClick={() => { setFrom(""); setTo(""); setBuyerQuery(""); setQuery({ page: 1, pageSize: query.pageSize }); }}>Limpiar filtros</button>
         <label>Por página <select value={query.pageSize} onChange={(event) => setQuery({ ...query, page: 1, pageSize: Number(event.target.value) })}>
           <option value={20}>20</option><option value={50}>50</option><option value={100}>100</option>
         </select></label>
@@ -66,7 +74,7 @@ export function SalesHistoryScreen(): ReactElement {
           <tbody>{result.sales.map((sale) => <tr key={sale.id}>
             <td className="sale-internal-id">{sale.id}</td><td>{saleDate(sale.createdAt)}</td>
             <td>{sale.createdByUsername ?? "Usuario histórico no identificado"}</td>
-            <td>{saleMoney(sale.totalCop)}</td><td>{paymentLabel(sale.payment.method)}</td>
+            <td>{saleMoney(sale.totalCop)}</td><td>{sale.payment ? paymentLabel(sale.payment.method) : "Fiado"}</td>
             <td>Local · facturación electrónica pendiente</td>
             <td><button className="text-button" disabled={opening} onClick={() => void open(sale.id)}>Abrir</button></td>
           </tr>)}</tbody>

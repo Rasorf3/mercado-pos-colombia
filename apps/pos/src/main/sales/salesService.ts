@@ -45,6 +45,7 @@ interface SaleRow {
   id: string;
   cash_session_id: string | null;
   status: SaleStatus;
+  settlement_type: "paid" | "on_account";
   total_cop: bigint;
   created_at: string;
   created_by_username: string | null;
@@ -76,6 +77,8 @@ interface BuyerSnapshotRow {
   document_type: string | null;
   document_number: string | null;
   email: string | null;
+  phone: string | null;
+  address: string | null;
 }
 
 interface ClientForSaleRow {
@@ -84,6 +87,10 @@ interface ClientForSaleRow {
   document_type: string | null;
   document_number: string | null;
   email: string | null;
+  phone: string | null;
+  address: string | null;
+  credit_limit_cop: bigint;
+  credit_balance_cop: bigint;
   active: bigint;
 }
 
@@ -102,6 +109,16 @@ export class SalesService {
   }
 
   createSale(input: SaleCreateInput, actorUserId: string | null = null): Sale {
+    const settlement = input.settlement ?? "paid";
+    if (settlement === "on_account" && input.payment) {
+      throw new Error("Una venta fiada no puede registrar un pago inicial.");
+    }
+    if (settlement === "paid" && !input.payment) {
+      throw new Error("Selecciona un medio de pago o marca la venta como fiada.");
+    }
+    if (settlement === "on_account" && !input.clientId) {
+      throw new Error("Para fiar una venta debes seleccionar un cliente.");
+    }
     const requestedDiscounts = new Map<string, { provided: boolean; discount: ProductDiscount | null }>();
     for (const line of input.items) {
       const selection = {
@@ -172,18 +189,27 @@ export class SalesService {
         unitPriceCop: product.sale_price_cop.toString(),
         discount: formatDiscountDraft(discount)
       })));
-      const payment = normalizeSalePayment(input.payment, amounts.totalCop);
+      let payment: ReturnType<typeof normalizeSalePayment> | null = null;
+      if (settlement === "on_account") {
+        if (!buyer) throw new Error("Para fiar una venta debes seleccionar un cliente activo.");
+        if (amounts.totalCop === 0n) throw new Error("Una venta fiada debe tener un total mayor que cero.");
+        if (buyer.credit_balance_cop + amounts.totalCop > buyer.credit_limit_cop) {
+          throw new Error("La venta supera el límite de fiado disponible para este cliente. Ajusta el límite o registra un abono.");
+        }
+      } else {
+        payment = normalizeSalePayment(input.payment!, amounts.totalCop);
+      }
       const saleId = randomUUID();
 
       this.database.prepare(`
-        INSERT INTO sales (id, status, total_cop, created_at, created_by_user_id, cash_session_id)
-        VALUES (?, 'local_pending_invoice', ?, ?, ?, ?)
-      `).run(saleId, amounts.totalCop, createdAt, actorUserId, cashSession.id);
+        INSERT INTO sales (id, status, total_cop, created_at, created_by_user_id, cash_session_id, settlement_type)
+        VALUES (?, 'local_pending_invoice', ?, ?, ?, ?, ?)
+      `).run(saleId, amounts.totalCop, createdAt, actorUserId, cashSession.id, settlement);
 
       this.database.prepare(`
         INSERT INTO sale_buyer_snapshots (
-          sale_id, client_id, buyer_name, document_type, document_number, email, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          sale_id, client_id, buyer_name, document_type, document_number, email, phone, address, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         saleId,
         buyer?.clientId ?? null,
@@ -191,6 +217,8 @@ export class SalesService {
         buyer?.documentType ?? null,
         buyer?.documentNumber ?? null,
         buyer?.email ?? null,
+        buyer?.phone ?? null,
+        buyer?.address ?? null,
         createdAt
       );
 
@@ -216,21 +244,24 @@ export class SalesService {
         );
       });
 
-      this.database.prepare(`
-        INSERT INTO sale_payments (
-          id, sale_id, method_id, amount_paid_cop, change_cop,
-          reference, authorization_code, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        randomUUID(),
-        saleId,
-        payment.method,
-        payment.amountPaidCop,
-        payment.changeCop,
-        payment.reference,
-        payment.authorizationCode,
-        createdAt
-      );
+      if (payment) {
+        this.database.prepare(`
+          INSERT INTO sale_payments (
+            id, sale_id, method_id, amount_paid_cop, change_cop,
+            reference, authorization_code, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          randomUUID(), saleId, payment.method, payment.amountPaidCop, payment.changeCop,
+          payment.reference, payment.authorizationCode, createdAt
+        );
+      } else {
+        this.database.prepare(`
+          INSERT INTO client_credit_entries (
+            id, client_id, entry_type, sale_id, amount_cop, method_id,
+            reference, authorization_code, created_by_user_id, created_at
+          ) VALUES (?, ?, 'sale_charge', ?, ?, NULL, NULL, NULL, ?, ?)
+        `).run(randomUUID(), buyer!.clientId, saleId, amounts.totalCop, actorUserId, createdAt);
+      }
 
       const updateStock = this.database.prepare(`
         UPDATE products
@@ -284,14 +315,28 @@ export class SalesService {
     const { from, until } = salesDateBounds(input);
     const conditions: string[] = [];
     const parameters: string[] = [];
+    const buyerQuery = input.buyerQuery?.trim() ?? "";
     if (from) { conditions.push("s.created_at >= ?"); parameters.push(from); }
     if (until) { conditions.push("s.created_at < ?"); parameters.push(until); }
+    if (buyerQuery) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM sale_buyer_snapshots buyer
+        WHERE buyer.sale_id = s.id AND (
+          instr(lower(COALESCE(buyer.buyer_name, '')), lower(?)) > 0
+          OR instr(lower(COALESCE(buyer.document_type, '')), lower(?)) > 0
+          OR instr(lower(COALESCE(buyer.document_number, '')), lower(?)) > 0
+          OR instr(lower(COALESCE(buyer.phone, '')), lower(?)) > 0
+          OR instr(lower(COALESCE(buyer.address, '')), lower(?)) > 0
+        )
+      )`);
+      parameters.push(buyerQuery, buyerQuery, buyerQuery, buyerQuery, buyerQuery);
+    }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     return this.database.transaction(() => {
       const count = this.database.prepare(`SELECT count(*) AS total FROM sales s ${where}`)
         .get(...parameters) as { total: bigint };
       const rows = this.database.prepare(`
-        SELECT s.id, s.cash_session_id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
+        SELECT s.id, s.cash_session_id, s.status, s.settlement_type, s.total_cop, s.created_at, u.username AS created_by_username
         FROM sales s LEFT JOIN pos_users u ON u.id = s.created_by_user_id ${where}
         ORDER BY s.created_at DESC, s.rowid DESC LIMIT ? OFFSET ?
       `).all(...parameters, input.pageSize, (input.page - 1) * input.pageSize) as SaleRow[];
@@ -303,6 +348,7 @@ export class SalesService {
           id: row.id,
           cashSessionId: row.cash_session_id,
           status: row.status,
+          settlement: row.settlement_type,
           totalCop: row.total_cop.toString(),
           createdByUsername: row.created_by_username,
           payment: this.getPayment(row.id),
@@ -316,7 +362,7 @@ export class SalesService {
   getSale(id: string): Sale {
     validateSalesRequest<string>(SaleIdSchema, id);
     const row = this.database.prepare(`
-      SELECT s.id, s.cash_session_id, s.status, s.total_cop, s.created_at, u.username AS created_by_username
+      SELECT s.id, s.cash_session_id, s.status, s.settlement_type, s.total_cop, s.created_at, u.username AS created_by_username
       FROM sales s LEFT JOIN pos_users u ON u.id = s.created_by_user_id WHERE s.id = ?
     `).get(id) as SaleRow | undefined;
     if (!row) throw new SaleNotFoundError();
@@ -331,6 +377,7 @@ export class SalesService {
       id: row.id,
       cashSessionId: row.cash_session_id,
       status: row.status,
+      settlement: row.settlement_type,
       totalCop: row.total_cop.toString(),
       createdByUsername: row.created_by_username,
       items: items.map(toSaleLine),
@@ -340,12 +387,12 @@ export class SalesService {
     };
   }
 
-  private getPayment(saleId: string): SalePayment {
+  private getPayment(saleId: string): SalePayment | null {
     const row = this.database.prepare(`
       SELECT method_id, amount_paid_cop, change_cop, reference, authorization_code
       FROM sale_payments WHERE sale_id = ?
     `).get(saleId) as SalePaymentRow | undefined;
-    if (!row) throw new Error("La venta local no tiene un registro de pago.");
+    if (!row) return null;
     return {
       method: row.method_id,
       amountPaidCop: row.amount_paid_cop.toString(),
@@ -355,10 +402,15 @@ export class SalesService {
     };
   }
 
-  private getActiveBuyer(clientId: string): BuyerSnapshot {
+  private getActiveBuyer(clientId: string): BuyerSnapshot & { credit_limit_cop: bigint; credit_balance_cop: bigint } {
     const row = this.database.prepare(`
-      SELECT id, name, document_type, document_number, email, active
-      FROM clients WHERE id = ?
+      SELECT c.id, c.name, c.document_type, c.document_number, c.email, c.phone, c.address,
+             c.credit_limit_cop, c.active,
+             COALESCE((
+               SELECT SUM(CASE WHEN e.entry_type = 'sale_charge' THEN e.amount_cop ELSE -e.amount_cop END)
+               FROM client_credit_entries e WHERE e.client_id = c.id
+             ), 0) AS credit_balance_cop
+      FROM clients c WHERE c.id = ?
     `).get(clientId) as ClientForSaleRow | undefined;
     if (!row || row.active !== 1n) {
       throw new Error("El cliente seleccionado no existe o está inactivo.");
@@ -368,13 +420,17 @@ export class SalesService {
       name: row.name,
       documentType: row.document_type,
       documentNumber: row.document_number,
-      email: row.email
+      email: row.email,
+      phone: row.phone,
+      address: row.address,
+      credit_limit_cop: row.credit_limit_cop,
+      credit_balance_cop: row.credit_balance_cop
     };
   }
 
   private getBuyer(saleId: string): BuyerSnapshot | null {
     const row = this.database.prepare(`
-      SELECT client_id, buyer_name, document_type, document_number, email
+      SELECT client_id, buyer_name, document_type, document_number, email, phone, address
       FROM sale_buyer_snapshots WHERE sale_id = ?
     `).get(saleId) as BuyerSnapshotRow | undefined;
     if (!row) throw new Error("La venta no tiene su instantánea de comprador registrada.");
@@ -385,7 +441,9 @@ export class SalesService {
       name: row.buyer_name,
       documentType: row.document_type,
       documentNumber: row.document_number,
-      email: row.email
+      email: row.email,
+      phone: row.phone,
+      address: row.address
     };
   }
 }

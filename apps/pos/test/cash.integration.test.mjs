@@ -50,6 +50,8 @@ test("apertura y cierre concilian ventas, conservan usuarios y bloquean operacio
   assert.equal(opened.status, "open");
   assert.equal(opened.openingCashCop, "50000");
   assert.equal(opened.expectedCashCop, "50000");
+  assert.equal(opened.creditPaymentsCop, "0");
+  assert.equal(opened.cashCreditPaymentsCop, "0");
   await assert.rejects(invoke(CASH_CHANNELS.open, { openingCashCop: "0" }), /Ya hay un turno/);
 
   await auth.login({ username: employee.username, password: "Cajero seguro 2026!" }, 71);
@@ -76,7 +78,10 @@ test("apertura y cierre concilian ventas, conservan usuarios y bloquean operacio
   assert.equal(current.salesCount, 3);
   assert.equal(current.totalSalesCop, "3000");
   assert.equal(current.cashSalesCop, "2000");
+  assert.equal(current.creditPaymentsCop, "0");
+  assert.equal(current.cashCreditPaymentsCop, "0");
   assert.equal(current.expectedCashCop, "52000");
+  assert.deepEqual(current.creditPaymentTotals, []);
   assert.deepEqual(current.paymentTotals, [
     { method: "cash", amountCop: "2000", salesCount: 2 },
     { method: "debit_card", amountCop: "1000", salesCount: 1 }
@@ -98,6 +103,9 @@ test("apertura y cierre concilian ventas, conservan usuarios y bloquean operacio
   assert.equal(closed.openedByUsername, admin.username);
   assert.equal(closed.closedByUsername, manager.username);
   assert.equal(closed.expectedCashCop, "52000");
+  assert.equal(closed.creditPaymentsCop, "0");
+  assert.equal(closed.cashCreditPaymentsCop, "0");
+  assert.deepEqual(closed.creditPaymentTotals, []);
   assert.equal(closed.countedCashCop, "51900");
   assert.equal(closed.varianceCashCop, "-100");
   assert.deepEqual(cash.overview(), { activeSession: null, recentSessions: [closed] });

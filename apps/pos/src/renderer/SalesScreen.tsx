@@ -33,12 +33,16 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
   const [saleStep, setSaleStep] = useState<SaleStep>("products");
   const [query, setQuery] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [settlement, setSettlement] = useState<"paid" | "on_account">("paid");
   const [amountPaidCop, setAmountPaidCop] = useState("0");
   const [reference, setReference] = useState("");
   const [authorizationCode, setAuthorizationCode] = useState("");
   const [buyerSearch, setBuyerSearch] = useState("");
   const [buyerMatches, setBuyerMatches] = useState<SaleClientMatch[]>([]);
   const [selectedBuyer, setSelectedBuyer] = useState<SaleClientMatch | null>(null);
+  const [creditLimitDraft, setCreditLimitDraft] = useState("");
+  const [editingCreditLimit, setEditingCreditLimit] = useState(false);
+  const [creditLimitBusy, setCreditLimitBusy] = useState(false);
   const [creatingBuyer, setCreatingBuyer] = useState(false);
   const [recentSales, setRecentSales] = useState<SaleSummary[]>([]);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
@@ -103,8 +107,14 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
     return "";
   }, [calculation, cart]);
 
+  const creditError = settlement !== "on_account" ? "" : !selectedBuyer
+    ? "Selecciona un cliente para fiar esta venta."
+    : BigInt(selectedBuyer.creditBalanceCop) + (calculation.value?.totalCop ?? 0n) > BigInt(selectedBuyer.creditLimitCop)
+      ? "La venta supera el límite de fiado disponible. Abona saldo o amplía el cupo del cliente."
+      : "";
+
   const paymentResult = useMemo(() => {
-    if (!calculation.value) return { value: null, error: "" };
+    if (!calculation.value || settlement === "on_account") return { value: null, error: "" };
     try {
       return {
         value: normalizeSalePayment({
@@ -118,7 +128,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
     } catch (error) {
       return { value: null, error: errorMessage(error) };
     }
-  }, [amountPaidCop, authorizationCode, calculation, method, reference]);
+  }, [amountPaidCop, authorizationCode, calculation, method, reference, settlement]);
 
   const loadProducts = useCallback(async (search: string) => {
     const requestId = ++searchRequestRef.current;
@@ -236,7 +246,8 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
 
   const submitSale = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (busy || !calculation.value || !paymentResult.value || stockError) return;
+    if (busy || !calculation.value || stockError ||
+        (settlement === "on_account" ? !selectedBuyer || Boolean(creditError) : !paymentResult.value)) return;
     const input: SaleCreateInput = {
       items: cart.map(({ product, quantity, discount, discountSource }) => ({
         productId: product.id,
@@ -244,12 +255,15 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
         ...(discountSource === "promotion" ? {} : { discount })
       })),
       ...(selectedBuyer ? { clientId: selectedBuyer.id } : {}),
-      payment: {
-        method,
-        amountPaidCop,
-        ...(reference.trim() ? { reference: reference.trim() } : {}),
-        ...(authorizationCode.trim() ? { authorizationCode: authorizationCode.trim() } : {})
-      }
+      ...(settlement === "on_account" ? { settlement: "on_account" as const } : {
+        settlement: "paid" as const,
+        payment: {
+          method,
+          amountPaidCop,
+          ...(reference.trim() ? { reference: reference.trim() } : {}),
+          ...(authorizationCode.trim() ? { authorizationCode: authorizationCode.trim() } : {})
+        }
+      })
     };
 
     setBusy(true);
@@ -260,6 +274,8 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
       setCart([]);
       setSaleStep("products");
       setSelectedBuyer(null);
+      setSettlement("paid");
+      setEditingCreditLimit(false);
       setBuyerSearch("");
       setReference("");
       setAuthorizationCode("");
@@ -279,6 +295,9 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
   const lineTotals = calculation.value?.lineTotalsCop ?? [];
   const showReference = method === "bank_transfer" || method === "nequi" || method === "daviplata" || method === "bre_b";
   const showAuthorization = method === "debit_card" || method === "credit_card";
+  const canCompleteSale = settlement === "on_account"
+    ? Boolean(selectedBuyer) && !creditError
+    : Boolean(paymentResult.value);
 
   const openDetail = async (id: string) => {
     try { setDetailSale(await window.electronAPI.sales.getSale(id)); }
@@ -293,7 +312,11 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
         name: created.name,
         documentType: created.documentType,
         documentNumber: created.documentNumber,
-        email: created.email
+        email: created.email,
+        phone: created.phone,
+        address: created.address,
+        creditLimitCop: created.creditLimitCop,
+        creditBalanceCop: created.creditBalanceCop
       };
       setSelectedBuyer(match);
       setBuyerSearch("");
@@ -306,12 +329,32 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
     }
   };
 
+  const saveCreditLimit = async () => {
+    if (!selectedBuyer || creditLimitBusy) return;
+    setCreditLimitBusy(true);
+    setMessage("");
+    try {
+      const updated = await window.electronAPI.clients.setCreditLimit(selectedBuyer.id, { creditLimitCop: creditLimitDraft });
+      setSelectedBuyer((current) => current?.id === updated.id ? {
+        ...current,
+        creditLimitCop: updated.creditLimitCop,
+        creditBalanceCop: updated.creditBalanceCop
+      } : current);
+      setEditingCreditLimit(false);
+      setMessage("Límite de fiado actualizado y auditado.");
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setCreditLimitBusy(false);
+    }
+  };
+
   if (detailSale) return <SaleDetail sale={detailSale} onClose={() => setDetailSale(null)} />;
 
   return (
     <section className="sales-page" aria-labelledby="sale-title">
       <div className="page-heading sales-heading">
-        <div><p className="eyebrow">Caja · operación local</p><h1 id="sale-title">Nueva venta</h1><p className="subheading">Registra productos, existencias y un único medio de pago.</p></div>
+        <div><p className="eyebrow">Caja · operación local</p><h1 id="sale-title">Nueva venta</h1><p className="subheading">Registra productos y el pago recibido o deja la venta fiada a un cliente.</p></div>
         {showSalesHistory && <button className="quiet-button" onClick={onBackToCatalog}>← Volver al catálogo</button>}
       </div>
 
@@ -372,32 +415,52 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
 
           <div className="sale-payment-options">
             <div className="sale-buyer-field">
-              <div className="sale-buyer-heading"><strong>Comprador</strong><span className="optional-label">opcional</span></div>
+              <div className="sale-buyer-heading"><strong>Comprador</strong><span className="optional-label">opcional, obligatorio para fiar</span></div>
               {selectedBuyer ? <div className="selected-buyer">
-                <div><strong>{selectedBuyer.name}</strong><small>{formatClientIdentity(selectedBuyer) || selectedBuyer.email || "Sin identificación ni correo"}</small></div>
-                <button type="button" className="quiet-small" onClick={() => setSelectedBuyer(null)}>Quitar</button>
+                <div><strong>{selectedBuyer.name}</strong><small>{formatClientIdentity(selectedBuyer) || selectedBuyer.phone || selectedBuyer.email || "Sin identificación ni contacto"}</small>
+                  <small>Saldo {formatCop(BigInt(selectedBuyer.creditBalanceCop))} · Cupo {formatCop(BigInt(selectedBuyer.creditLimitCop))}</small>
+                  {selectedBuyer.phone && <small>Teléfono: {selectedBuyer.phone}</small>}
+                </div>
+                <div className="selected-buyer-actions"><button type="button" className="quiet-small" onClick={() => { setCreditLimitDraft(selectedBuyer.creditLimitCop); setEditingCreditLimit((current) => !current); }}>Ajustar cupo</button>
+                  <button type="button" className="quiet-small" onClick={() => { setSelectedBuyer(null); setSettlement("paid"); setEditingCreditLimit(false); }}>Quitar</button></div>
               </div> : <>
                 {!creatingBuyer && <input className="buyer-search-input" type="search" maxLength={120} value={buyerSearch} placeholder="Busca nombre, identificación o correo" aria-label="Buscar cliente para asociar a la venta" onChange={(event) => setBuyerSearch(event.target.value)} />}
                 {buyerSearch.trim() && <div className="buyer-match-list">
                   {buyerMatches.length === 0 ? <p>Sin clientes activos coincidentes.</p> : buyerMatches.map((client) => <button type="button" key={client.id} onClick={() => { setSelectedBuyer(client); setBuyerSearch(""); setBuyerMatches([]); }}>
-                    <strong>{client.name}</strong><small>{formatClientIdentity(client) || client.email || "Sin identificación ni correo"}</small>
+                    <strong>{client.name}</strong><small>{formatClientIdentity(client) || client.phone || client.email || "Sin identificación ni contacto"}</small>
+                    <small>Saldo {formatCop(BigInt(client.creditBalanceCop))} · Cupo {formatCop(BigInt(client.creditLimitCop))}</small>
                   </button>)}
                 </div>}
                 {creatingBuyer ? <QuickClientCreateForm onCancel={() => setCreatingBuyer(false)} onSave={createBuyer} /> : <button type="button" className="text-button quick-client-trigger" onClick={() => { setBuyerSearch(""); setBuyerMatches([]); setCreatingBuyer(true); }}>＋ Crear cliente y asociar</button>}
               </>}
+              {selectedBuyer && editingCreditLimit && <div className="credit-limit-editor">
+                <label className="field">Nuevo cupo de fiado (COP)<CopIntegerInput required value={creditLimitDraft} onValueChange={setCreditLimitDraft} /></label>
+                <button type="button" className="primary-button" disabled={creditLimitBusy} onClick={() => void saveCreditLimit()}>{creditLimitBusy ? "Guardando…" : "Guardar cupo"}</button>
+                <small>El cupo no puede quedar por debajo del saldo pendiente.</small>
+              </div>}
+              <label className="active-check credit-sale-toggle">
+                <input type="checkbox" checked={settlement === "on_account"} disabled={!selectedBuyer} onChange={(event) => setSettlement(event.target.checked ? "on_account" : "paid")} />
+                <span><strong>Fiar esta venta</strong><small>{selectedBuyer ? "El total completo quedará pendiente en la cuenta del cliente." : "Selecciona un cliente para habilitar esta opción."}</small></span>
+              </label>
+              {settlement === "on_account" && <div className={`credit-sale-preview ${creditError ? "error" : ""}`} role={creditError ? "alert" : "status"}>
+                <span>Saldo actual: <strong>{selectedBuyer ? formatCop(BigInt(selectedBuyer.creditBalanceCop)) : "—"}</strong></span>
+                <span>Saldo después de esta venta: <strong>{selectedBuyer ? formatCop(BigInt(selectedBuyer.creditBalanceCop) + due) : "—"}</strong></span>
+                <span>Límite: <strong>{selectedBuyer ? formatCop(BigInt(selectedBuyer.creditLimitCop)) : "—"}</strong></span>
+                {creditError && <small>{creditError}</small>}
+              </div>}
               <small>También puedes registrar la venta sin perfil de comprador.</small>
             </div>
 
-            <div className="payment-fields">
+            {settlement === "paid" ? <div className="payment-fields">
               <label className="field">Método de pago<select ref={paymentMethodRef} value={method} onChange={(event) => { const nextMethod = event.target.value as PaymentMethod; setMethod(nextMethod); setReference(""); setAuthorizationCode(""); setAmountPaidCop(nextMethod === "cash" ? "0" : totalCop); }}>{PAYMENT_METHOD_OPTIONS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select></label>
               <label className="field">{method === "cash" ? "Efectivo recibido (COP)" : "Valor pagado (COP)"}<CopIntegerInput ref={paymentAmountRef} required value={amountPaidCop} onValueChange={setAmountPaidCop} readOnly={method !== "cash"} placeholder="Escribe el valor recibido" onFocus={(event) => { if (method === "cash" && event.currentTarget.value === "0") setAmountPaidCop(""); }} /></label>
               {paymentResult.value?.changeCop ? <div className="change-due"><span>Cambio</span><strong>{formatCop(paymentResult.value.changeCop)}</strong></div> : null}
               {showReference && <label className="field full-payment-field">Referencia de operación <span className="optional-label">opcional</span><input maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} placeholder="No ingreses claves ni datos bancarios" /></label>}
               {showAuthorization && <label className="field full-payment-field">Código de autorización <span className="optional-label">opcional</span><input maxLength={64} value={authorizationCode} onChange={(event) => setAuthorizationCode(event.target.value)} placeholder="No ingreses número de tarjeta, CVV ni PIN" /></label>}
-            </div>
-            {paymentResult.error && <p className="form-error" role="alert">{paymentResult.error}</p>}
-            <button className="primary-button complete-sale-button" type="submit" disabled={busy || cashAvailability?.isOpen !== true || cart.length === 0 || !calculation.value || !paymentResult.value || Boolean(stockError)}>{busy ? "Guardando venta…" : "Registrar venta local"}</button>
-            <p className="payment-disclaimer">Solo registra el medio y valor declarado. No procesa tarjetas ni verifica transferencias.</p>
+            </div> : <p className="credit-sale-note">No se registrará un pago en esta venta. El saldo completo se cargará al cliente y podrá consultarse y abonarse en <strong>Fiados</strong>.</p>}
+            {settlement === "paid" && paymentResult.error && <p className="form-error" role="alert">{paymentResult.error}</p>}
+            <button className="primary-button complete-sale-button" type="submit" disabled={busy || cashAvailability?.isOpen !== true || cart.length === 0 || !calculation.value || !canCompleteSale || Boolean(stockError)}>{busy ? "Guardando venta…" : settlement === "on_account" ? "Registrar venta fiada" : "Registrar venta local"}</button>
+            {settlement === "paid" && <p className="payment-disclaimer">Solo registra el medio y valor declarado. No procesa tarjetas ni verifica transferencias.</p>}
           </div>
         </div>
       </form>}
@@ -407,7 +470,7 @@ export function SalesScreen({ onBackToCatalog, showSalesHistory = true }: Props)
         {recentSales.length === 0 ? <p className="sale-search-empty">Todavía no hay ventas locales.</p> : <div className="recent-sales-list">{recentSales.map((sale) => (
           <article className="recent-sale-row" key={sale.id}>
             <div className="recent-sale-id"><strong>Venta {sale.id.slice(0, 8)}</strong><small>{formatDate(sale.createdAt)} · Registró: {sale.createdByUsername ?? "Usuario histórico no identificado"} · {sale.buyer?.name ?? "Sin cliente asociado"}</small></div>
-            <span className="payment-method-label">{methodLabel(sale.payment.method)}</span>
+            <span className="payment-method-label">{sale.payment ? methodLabel(sale.payment.method) : "Fiado"}</span>
             <strong className="recent-sale-total">{formatCop(BigInt(sale.totalCop))}</strong>
             <span className="pending-pill">Local · pendiente de factura</span>
             <button className="text-button" type="button" onClick={() => void openDetail(sale.id)}>Ver detalle</button>
@@ -423,7 +486,7 @@ function CompletedSale({ sale, onDetail }: { sale: Sale; onDetail: () => void })
   return (
     <section className="sale-completed-banner" aria-label="Venta guardada localmente">
       <div className="completed-check" aria-hidden="true">✓</div>
-      <div><strong>Venta guardada localmente</strong><span>Venta {sale.id.slice(0, 8)} · {formatCop(BigInt(sale.totalCop))} · {methodLabel(sale.payment.method)} · {sale.buyer?.name ?? "Sin cliente asociado"}</span></div>
+      <div><strong>Venta guardada localmente</strong><span>Venta {sale.id.slice(0, 8)} · {formatCop(BigInt(sale.totalCop))} · {sale.payment ? methodLabel(sale.payment.method) : "Fiado"} · {sale.buyer?.name ?? "Sin cliente asociado"}</span></div>
       <span className="pending-pill">No emitida ante DIAN</span>
       <button type="button" className="text-button" onClick={onDetail}>Ver detalle</button>
       <ReceiptActions key={sale.id} saleId={sale.id} />

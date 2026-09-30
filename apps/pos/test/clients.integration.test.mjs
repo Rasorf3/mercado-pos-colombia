@@ -34,12 +34,18 @@ test("persiste, busca, edita y desactiva perfiles; la venta conserva la instant√
     name: "  Mercado La 14 ",
     documentType: " cc ",
     documentNumber: " 001234 ",
-    email: "  COMPRAS@EJEMPLO.CO "
+    email: "  COMPRAS@EJEMPLO.CO ",
+    phone: " 3001234567 ",
+    address: " Calle 10 # 20-30 "
   });
   assert.equal(created.name, "Mercado La 14");
   assert.equal(created.documentType, "CC");
   assert.equal(created.documentNumber, "001234");
   assert.equal(created.email, "compras@ejemplo.co");
+  assert.equal(created.phone, "3001234567");
+  assert.equal(created.address, "Calle 10 # 20-30");
+  assert.equal(created.creditLimitCop, "300000");
+  assert.equal(clients.list({ query: "3001234567", includeInactive: false })[0].id, created.id);
   assert.equal(clients.list({ query: "0012", includeInactive: false })[0].id, created.id);
   assert.throws(() => clients.create({
     name: "Duplicado",
@@ -69,7 +75,9 @@ test("persiste, busca, edita y desactiva perfiles; la venta conserva la instant√
     name: "Mercado La 14",
     documentType: "CC",
     documentNumber: "001234",
-    email: "compras@ejemplo.co"
+    email: "compras@ejemplo.co",
+    phone: "3001234567",
+    address: "Calle 10 # 20-30"
   });
 
   clients.update(created.id, {
@@ -77,6 +85,8 @@ test("persiste, busca, edita y desactiva perfiles; la venta conserva la instant√
     documentType: "NIT",
     documentNumber: "900123456-7",
     email: "nueva@ejemplo.co",
+    phone: "3119998877",
+    address: "Nueva direcci√≥n",
     active: false
   });
   assert.equal(clients.list({ query: "", includeInactive: false }).length, 0);

@@ -4,6 +4,7 @@ import type { ClientsBridge } from "../clientsBridge";
 import type { SalesBridge } from "../salesBridge";
 import type { AuthBridge } from "../authBridge";
 import type { CashBridge } from "../cashBridge";
+import type { ReceivablesBridge } from "../receivablesBridge";
 
 declare global {
   interface Window {
@@ -14,6 +15,7 @@ declare global {
       clients: ClientsBridge;
       sales: SalesBridge;
       cash: CashBridge;
+      receivables: ReceivablesBridge;
     };
   }
 }

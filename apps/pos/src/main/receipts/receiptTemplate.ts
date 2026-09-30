@@ -48,6 +48,8 @@ export function renderReceipt(sale: Sale, layout: ReceiptLayout): string {
 </th></tr></thead><tbody>
 ${buyer ? `<tr><td><strong>Comprador</strong><p>${text(buyer.name)}</p>
 ${buyer.documentType && buyer.documentNumber ? `<p>${text(buyer.documentType)}: ${text(buyer.documentNumber)}</p>` : ""}
+${buyer.phone ? `<p>Teléfono: ${text(buyer.phone)}</p>` : ""}
+${buyer.address ? `<p>Dirección: ${text(buyer.address)}</p>` : ""}
 ${buyer.email ? `<p>${text(buyer.email)}</p>` : ""}</td></tr>` : ""}
 ${sale.items.map((item) => `<tr><td class="item">
   <p class="name">${text(item.productName)}</p>
@@ -57,11 +59,12 @@ ${sale.items.map((item) => `<tr><td class="item">
 </td></tr>`).join("")}
 <tr><td class="summary">
   <p class="pair total"><span>Total registrado</span><span>${money(sale.totalCop)}</span></p>
-  <p class="pair"><span>Medio de pago</span><span>${text(paymentLabel(sale.payment.method))}</span></p>
+  ${sale.payment ? `<p class="pair"><span>Medio de pago</span><span>${text(paymentLabel(sale.payment.method))}</span></p>
   <p class="pair"><span>Valor pagado</span><span>${money(sale.payment.amountPaidCop)}</span></p>
   ${sale.payment.method === "cash" ? `<p class="pair"><span>Cambio</span><span>${money(sale.payment.changeCop)}</span></p>` : ""}
   ${sale.payment.reference ? `<p>Referencia: ${text(sale.payment.reference)}</p>` : ""}
-  ${sale.payment.authorizationCode ? `<p>Autorización declarada: ${text(sale.payment.authorizationCode)}</p>` : ""}
+  ${sale.payment.authorizationCode ? `<p>Autorización declarada: ${text(sale.payment.authorizationCode)}</p>` : ""}` : `<p class="pair"><span>Liquidación</span><span>Fiado · saldo pendiente</span></p>
+  <p>El saldo actual del cliente puede variar con los abonos; consulta la sección Fiados.</p>`}
 </td></tr>
 <tr><td class="foot">Venta local. Facturación electrónica pendiente.<br>No acredita emisión ni validación ante la DIAN.</td></tr>
 </tbody></table></body></html>`;
