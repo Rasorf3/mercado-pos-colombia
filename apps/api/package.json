@@ -11,14 +11,18 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build --workspace @mercado-pos/contracts",
-    "test": "tsx --test test/health.test.ts"
+    "test": "tsx --test test/*.test.ts test/*.test.mjs"
   },
   "dependencies": {
     "@mercado-pos/contracts": "0.1.0",
-    "fastify": "^5.4.0"
+    "@mercado-pos/domain": "0.1.0",
+    "fastify": "^5.4.0",
+    "pg": "8.23.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }

@@ -4,7 +4,7 @@ Estado: primera versión funcional, offline y limitada a una caja por instalaci�
 
 ## Criterio de operación
 
-- Solo puede existir un turno abierto en la base SQLite de esta instalación. No es una caja compartida entre equipos ni una sesión individual por empleado.
+- Solo puede existir un turno abierto propio de esta instalación. SQLite puede conservar turnos replicados de otras cajas, pero no usarlos como turno local. No es un cajón compartido entre equipos ni una sesión individual por empleado.
 - Admin y EmpleadoJefe pueden abrir y cerrar turnos. Empleado no administra turnos, pero puede registrar ventas mientras haya uno abierto.
 - El fondo inicial y el conteo final son valores enteros COP. Se guardan como enteros SQLite y se manejan como `bigint` en cálculos; no se admite fracción de peso.
 - El cierre puede guardarse aunque el conteo real no coincida con el saldo esperado. La diferencia queda registrada con signo: positivo = sobrante, negativo = faltante.
@@ -24,7 +24,7 @@ Las ventas preexistentes a la migración 7 conservan `cash_session_id = NULL`; n
 - No hay operaciones de ingreso/retiro, gastos, depósitos, retiros de caja, apertura de cajón ni conciliación bancaria. El efectivo esperado no puede explicar esos movimientos todavía; el cajero/administrador debe considerar esa limitación al analizar la diferencia.
 - El historial de Caja muestra el turno activo y hasta 20 cierres recientes. El detalle de venta identifica el turno cuando la venta fue creada después de la migración.
 - El cierre local es un control operativo. No es cierre fiscal, informe DIAN, factura electrónica, conciliación de pagos ni sincronización central.
-- Los turnos se guardan en SQLite local y no se sincronizan; una pérdida o daño del perfil local exige una estrategia de respaldo/restauración, que sigue pendiente.
+- Los turnos se guardan en SQLite y, si la instalación se vincula, se replican sin mezclar el efectivo entre equipos. La migración v10 añade `origin_device_id` y un turno abierto máximo por origen; esta instalación solo opera y muestra el suyo. Ventas/abonos de otra caja no se suman a su efectivo. Una pérdida del perfil requiere recuperación administrada; no se recrea una caja clonando otra SQLite. Ver [`multi-register-sync.md`](multi-register-sync.md).
 
 ## Integridad y seguridad
 

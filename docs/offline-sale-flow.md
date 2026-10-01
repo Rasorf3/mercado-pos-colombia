@@ -1,6 +1,6 @@
 # Flujo de venta offline
 
-La caja ya implementa la captura local mínima descrita abajo. La sincronización y facturación electrónica siguen pendientes.
+La caja implementa captura local y sincronización optativa. Facturación electrónica sigue pendiente; sincronizar no factura.
 
 ## Flujo propuesto
 
@@ -11,7 +11,7 @@ La caja ya implementa la captura local mínima descrita abajo. La sincronizació
 5. Si una escritura falla, SQLite revierte la venta, instantáneas, pago/cargo, movimientos y descuento de stock.
 6. La pantalla informa `local_pending_invoice`: no es factura electrónica y no se ha emitido ni aceptado por la DIAN.
 7. No se procesa la tarjeta ni se verifica transferencia, Nequi, DaviPlata o Bre-B. Las referencias y códigos de autorización son solo datos opcionales declarados.
-8. La sincronización hacia la API/PostgreSQL y la facturación electrónica son trabajo futuro.
+8. Si la instalación está vinculada, venta y evento outbox se guardan juntos y se envían a API/PostgreSQL con reintentos idempotentes. Las ventas pagadas siguen offline con el stock local disponible. Para fiados/abonos compartidos main exige conexión y reserva central: no crea una operación sin autorización. Una caída posterior al commit no borra lo guardado.
 
 Después del cierre, la pantalla permite imprimir o guardar un comprobante local en PDF. El historial permite volver a consultar la venta por fecha y abrir su detalle; todos los importes, líneas, pago y comprador provienen de las instantáneas guardadas en SQLite. La edición posterior de productos/clientes no interviene en estas lecturas.
 
@@ -25,7 +25,9 @@ El módulo local de clientes permite crear, editar, buscar y desactivar perfiles
 borrador → local_pending_invoice → (integración fiscal futura)
 ```
 
-No se declara estado de sincronización o estado DIAN en esta etapa. El total suma subtotales por línea; cada línea se redondea half-up al peso COP más cercano. No se calculan impuestos.
+El estado fiscal permanece `local_pending_invoice`. Estado de conexión/cola/incidencias se muestra aparte: enviar o descargar un evento no significa aceptación DIAN. El total suma subtotales por línea; cada línea se redondea half-up al peso COP más cercano. No se calculan impuestos.
+
+Stock entre cajas se suma por movimientos, no por sobrescritura de saldos. Si las ventas offline superaron el total global, quedan guardadas y aparece un faltante para conteo/conciliación por Admin; la disponibilidad local se mantiene no negativa. Consultar [`multi-register-sync.md`](multi-register-sync.md) antes de vincular equipos.
 
 ## Reglas de seguridad
 

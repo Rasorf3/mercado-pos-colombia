@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
+import { trackedTransaction } from "../sync/syncJournal.ts";
 import type {
   CashAvailability,
   CashCreditPaymentTotal,
@@ -77,7 +78,7 @@ export class CashService {
       SELECT cs.opened_at, u.username AS opened_by_username
       FROM cash_sessions cs
       JOIN pos_users u ON u.id = cs.opened_by_user_id
-      WHERE cs.status = 'open'
+      WHERE cs.status = 'open' AND cs.origin_device_id=(SELECT device_id FROM sync_settings WHERE id=1)
     `).get() as { opened_at: string; opened_by_username: string } | undefined;
     return row
       ? { isOpen: true, openedAt: row.opened_at, openedByUsername: row.opened_by_username }
@@ -92,7 +93,7 @@ export class CashService {
         : null;
       const recentRows = this.database.prepare(`
         ${this.sessionSelect()}
-        WHERE cs.status = 'closed'
+        WHERE cs.status = 'closed' AND cs.origin_device_id=(SELECT device_id FROM sync_settings WHERE id=1)
         ORDER BY cs.closed_at DESC, cs.rowid DESC
         LIMIT ?
       `).all(RECENT_SESSION_LIMIT) as SessionRow[];
@@ -105,7 +106,7 @@ export class CashService {
 
   openSession(input: OpenCashSessionInput, actorUserId: string): CashSession {
     const openingCashCop = parseCopInteger(input.openingCashCop);
-    const open = this.database.transaction(() => {
+    const open = trackedTransaction(this.database, "cash", actorUserId, () => {
       if (this.getSessionRow("open")) {
         throw new Error("Ya hay un turno de caja abierto. Ciérralo antes de iniciar otro.");
       }
@@ -123,7 +124,7 @@ export class CashService {
 
   closeSession(input: CloseCashSessionInput, actorUserId: string): CashSession {
     const countedCashCop = parseCopInteger(input.countedCashCop);
-    const close = this.database.transaction(() => {
+    const close = trackedTransaction(this.database, "cash", actorUserId, () => {
       const row = this.getSessionRow("open");
       if (!row) throw new Error("No hay un turno de caja abierto para cerrar.");
 
@@ -307,7 +308,7 @@ export class CashService {
   }
 
   private getSessionRow(status: "open" | "closed"): SessionRow | undefined {
-    return this.database.prepare(`${this.sessionSelect()} WHERE cs.status = ?`).get(status) as SessionRow | undefined;
+    return this.database.prepare(`${this.sessionSelect()} WHERE cs.status = ? AND cs.origin_device_id=(SELECT device_id FROM sync_settings WHERE id=1)`).get(status) as SessionRow | undefined;
   }
 
   private getSessionRowById(id: string): SessionRow | undefined {

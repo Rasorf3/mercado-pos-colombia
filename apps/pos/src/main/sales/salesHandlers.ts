@@ -10,14 +10,16 @@ import type { AuthService } from "../auth/authService.ts";
 import { assertTrustedMainFrame } from "../auth/ipcSecurity.ts";
 import { roleCan } from "@mercado-pos/domain";
 import { validateSalesRequest } from "./salesRequests.ts";
+import type { SyncService } from "../sync/syncService.ts";
 
 export function createSalesHandlers(
-  service: SalesService, receipts: ReceiptService, getWindow: () => BrowserWindow | null, auth: AuthService
+  service: SalesService, receipts: ReceiptService, getWindow: () => BrowserWindow | null, auth: AuthService, sync?:SyncService
 ): Record<string, (event: IpcMainInvokeEvent, input?: unknown) => unknown> {
   const operations: Record<string, (event: IpcMainInvokeEvent, input?: unknown) => unknown> = {
     [SALES_CHANNELS.createSale]: (event, input) => {
       const user = auth.requireCapability(event.sender.id, "sales:create");
       validateSalesRequest<SaleCreateInput>(SaleCreateSchema, input);
+      if(input.settlement==="on_account" && sync) return sync.withCredit(user,input.clientId!,()=>service.quoteCredit(input),()=>service.createSale(input,user.id));
       return service.createSale(input, user.id);
     },
     [SALES_CHANNELS.listRecentSales]: (event) => {

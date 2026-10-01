@@ -1,6 +1,6 @@
 # Acceso local y roles
 
-Estado: primera implementación local. La API y la sincronización no usan esta autenticación.
+Estado: autenticación de usuarios local; sincronización optativa autentica dispositivos por separado, no sesiones centrales de empleados.
 
 ## Inicio de sesión
 
@@ -28,6 +28,8 @@ Estado: primera implementación local. La API y la sincronización no usan esta 
 | Ampliar el límite de fiado del cliente | Todo | Sí | Sí | Sí |
 | Administrar cuentas | Todo | Sí | No | No |
 | Consultar y editar el perfil del comercio | Todo | Sí | No | No |
+| Vincular caja y revisar/conciliar incidencias | Todo | Sí | No | No |
+| Consultar conexión y número de pendientes | Todo | Sí | Sí | Sí |
 | Apertura y cierre de caja / proveedores | Todo | Sí | Sí | No |
 
 La interfaz oculta secciones según el rol, pero esa ocultación no es la barrera de seguridad: cada handler IPC del proceso principal exige sesión y vuelve a comprobar el permiso. Se deniega por defecto; al agregar una capacidad futura se debe autorizar explícitamente a los roles ordinarios. AdminMaster queda reservado para las capacidades especiales que se definan después. La operación de venta guarda el UUID del usuario en la venta y en sus movimientos de salida; catálogo, movimientos y clientes guardan quién los creó o actualizó. Las ventas históricas previas a esta migración mantienen esos campos en `NULL`.
@@ -48,6 +50,6 @@ Los perfiles guardan nombre, identificación, correo, teléfono y dirección cua
 
 - `admin_master` existe como identificador reservado y obtiene todas las capacidades actuales y las que se agreguen al mapa de permisos. No hay credencial, contraseña fija, cuenta inicial, pantalla ni operación de IPC para asignarlo. El Admin del comercio no lo puede crear ni cambiar roles a ese valor. El mecanismo para acreditar al desarrollador debe diseñarse antes de habilitar ese acceso; editar SQLite manualmente no es una interfaz soportada.
 - La cuenta Admin puede asignar `employee_manager` junto con `admin` y `employee`. No hay edición posterior del rol de cuentas existentes.
-- No hay pantalla de proveedores. Apertura y cierre local de caja sí están disponibles; movimientos manuales de efectivo, varios cajones por instalación y sincronización siguen pendientes.
+- No hay pantalla de proveedores. Apertura/cierre y sincronización optativa sí están disponibles; movimientos manuales de efectivo y varios cajones por instalación siguen pendientes.
 - La autenticación es una barrera de la aplicación local, no cifrado de la base. Alguien con acceso al mismo perfil del sistema operativo y al archivo SQLite puede modificar o copiar datos fuera de la caja. Protegerse de ese escenario requerirá controles del sistema operativo/cifrado y un mecanismo de recuperación diseñado aparte.
-- No existe autenticación, usuarios ni aislamiento de comercios en `apps/api`; `/health` continúa siendo una ruta técnica independiente.
+- La API vinculada autentica dispositivos, aísla comercios y valida las operaciones/capacidades de los roles declarados por el POS. Las cuentas/contraseñas siguen locales y no se replican: solo nombres/UUID de actores como referencias desactivadas, excluidas del login y de administración de usuarios. No hay servicio central de sesión/revocación de empleados ni garantía ante una caja/token alterado. `/health` continúa público e independiente. Ver [`multi-register-sync.md`](multi-register-sync.md) antes de desplegar.

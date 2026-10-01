@@ -17,13 +17,13 @@ Separar la experiencia de caja local, la API y las reglas de negocio para que ca
 ┌──────────────────────────────┐
 │ apps/api                     │
 │ Fastify + TypeScript          │
-│ /health y futuras rutas       │
+│ /health, /sync/* optativas     │
 └──────────────┬───────────────┘
-               │ futura sincronización
+               │ eventos autenticados
                ▼
 ┌──────────────────────────────┐
 │ PostgreSQL                   │
-│ Se añadirá después            │
+│ Central optativo              │
 └──────────────────────────────┘
 ```
 
@@ -71,6 +71,6 @@ El alcance, el libro de cargos/abonos y los límites de cartera se documentan en
 
 ## Evolución prevista
 
-1. Definir idempotencia y estados de sincronización para ventas locales.
-2. Añadir sincronización autenticada hacia PostgreSQL.
-3. Diseñar la integración DIAN después de cerrar requisitos fiscales y de seguridad.
+La migración SQLite v10 y `main/sync` añaden outbox/inbox durable, identidad de instalación, respaldo previo verificado y aplicación atómica de eventos. Los servicios existentes encolan únicamente cuando la instalación se vincula; se mantienen las fronteras React/preload/main. `apps/api/src/sync` usa `pg`, transacciones y aislamiento por comercio. PGlite es solo una dependencia de pruebas. El stock global se deriva de movimientos y puede evidenciar faltantes tras ventas offline, sin permitir una nueva venta que supere la disponibilidad local. Fiados y abonos compartidos requieren reserva central antes de commit. Los turnos permanecen separados por origen. Cuentas y perfil Mi empresa no se replican; actores remotos quedan como referencias desactivadas.
+
+Ver [`multi-register-sync.md`](multi-register-sync.md) para protocolo, conflictos, credenciales, vinculación, recuperación y limitaciones. Aún se debe validar despliegue con PostgreSQL real/HTTPS y varias máquinas, completar administración central/revocación y respaldos periódicos. DIAN continúa pendiente de configuración fiscal confirmada.

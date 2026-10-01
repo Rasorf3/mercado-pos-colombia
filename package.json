@@ -2,7 +2,7 @@
   "name": "mercado-pos-colombia",
   "version": "0.1.0",
   "private": true,
-  "description": "Esqueleto de un punto de venta para Colombia",
+  "description": "Punto de venta local-first para Colombia",
   "engines": {
     "node": ">=24.0.0",
     "npm": ">=11.0.0"
@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "dev:pos": "npm run build:packages && npm run start --workspace @mercado-pos/pos",
-    "dev:api": "npm run dev --workspace @mercado-pos/api",
+    "dev:api": "npm run build:packages && npm run dev --workspace @mercado-pos/api",
     "typecheck": "npm run build:packages && npm run typecheck --workspace @mercado-pos/api && npm run typecheck --workspace @mercado-pos/pos",
     "test": "npm run build:packages && npm run test --workspaces --if-present",
     "build:packages": "npm run build --workspace @mercado-pos/contracts && npm run build --workspace @mercado-pos/domain",

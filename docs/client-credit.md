@@ -1,6 +1,6 @@
 # Fiados y cuentas por cobrar locales
 
-Estado: implementado para operación local offline. No procesa pagos ni cambia el estado de facturación electrónica.
+Estado: operación local offline en instalaciones sin vincular; cartera compartida optativa con autorización central obligatoria. No procesa pagos ni cambia el estado de facturación electrónica.
 
 ## Reglas de operación
 
@@ -21,6 +21,7 @@ La venta sigue en estado interno `local_pending_invoice`. Un cargo por fiado no 
 
 ## Límites
 
-- No hay cobro automático, integración con bancos, recordatorios, intereses, cuotas, vencimientos, cartera compartida, informes de antigüedad, notas crédito ni sincronización entre equipos.
-- Las cuentas y su libro viven en el SQLite local de la caja. Se requiere una estrategia de copia de seguridad/restauración antes de usarlo como registro contable principal.
+- En una caja vinculada, fiados/abonos requieren sincronizar y reservar el delta en PostgreSQL. Sin servidor se bloquean nuevas operaciones de cartera compartida, aunque se admiten ventas pagadas locales. Una reserva autorizada antes del corte respalda la operación ya confirmada; el reintento consume una sola vez. No se expira automáticamente ni libera cupo con un abono todavía pendiente. Cambiar el cupo exige conexión y puede generar incidencia si compite con otro cambio/reserva; el cupo central es el vigente. Ver [`multi-register-sync.md`](multi-register-sync.md).
+- No hay cobro automático, integración con bancos, recordatorios, intereses, cuotas, vencimientos, informes de antigüedad ni notas crédito.
+- El libro persiste en SQLite y se replica si la instalación está vinculada. La consulta desconectada puede mostrar un saldo desactualizado; no constituye autorización para nuevo fiado/abono. Se requiere desplegar/probar el servidor y definir copia periódica/restauración antes de usarlo como registro contable principal.
 - El máximo visible por consulta es 100 clientes y los últimos 100 movimientos del cliente elegido.

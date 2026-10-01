@@ -10,11 +10,13 @@ import {
 import { RECEIVABLES_CHANNELS } from "../../receivablesBridge.ts";
 import type { ReceivablesService } from "./receivablesService.ts";
 import type { AuthService } from "../auth/authService.ts";
+import type { SyncService } from "../sync/syncService.ts";
 
 export function registerReceivablesIpc(
   service: ReceivablesService,
   getWindow: () => Electron.BrowserWindow | null,
-  auth: AuthService
+  auth: AuthService,
+  sync?: SyncService
 ): void {
   const operations: Record<string, (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown> = {
     [RECEIVABLES_CHANNELS.listAccounts]: (event, input) => {
@@ -30,6 +32,8 @@ export function registerReceivablesIpc(
     [RECEIVABLES_CHANNELS.recordPayment]: (event, input) => {
       const user = auth.requireCapability(event.sender.id, "credit:collect");
       validate(CreditPaymentInputSchema, input);
+      const payment=input as CreditPaymentInput;
+      if(sync)return sync.withCredit(user,payment.clientId,()=> (-BigInt(payment.amountCop)).toString(),()=>service.recordPayment(payment,user.id));
       return service.recordPayment(input as CreditPaymentInput, user.id);
     }
   };

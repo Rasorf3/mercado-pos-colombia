@@ -10,6 +10,8 @@ import { CATALOG_AND_SALE_DISCOUNTS_MIGRATION } from "./migrations/006_catalog_a
 import { CASH_SESSIONS_MIGRATION } from "./migrations/007_cash_sessions.ts";
 import { CLIENT_CREDIT_MIGRATION } from "./migrations/008_client_credit.ts";
 import { COMPANY_PROFILE_MIGRATION } from "./migrations/009_company_profile.ts";
+import { SYNC_MIGRATION } from "./migrations/010_sync.ts";
+import { retainPreSyncBackup } from "./migrationBackup.ts";
 
 const MIGRATIONS = [
   INITIAL_CATALOG_MIGRATION,
@@ -20,7 +22,8 @@ const MIGRATIONS = [
   CATALOG_AND_SALE_DISCOUNTS_MIGRATION,
   CASH_SESSIONS_MIGRATION,
   CLIENT_CREDIT_MIGRATION,
-  COMPANY_PROFILE_MIGRATION
+  COMPANY_PROFILE_MIGRATION,
+  SYNC_MIGRATION
 ];
 
 export function openPosDatabase(filePath: string): Database.Database {
@@ -47,6 +50,7 @@ export function openPosDatabase(filePath: string): Database.Database {
       .get(BigInt(migration.version)) as { version: bigint } | undefined;
 
     if (!applied) {
+      if (migration.version === 10) retainPreSyncBackup(database, filePath);
       const runMigration = database.transaction(() => {
         migration.apply(database);
         database

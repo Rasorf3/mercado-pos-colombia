@@ -6,3 +6,4 @@ export * from "./auth.js";
 export * from "./cash.js";
 export * from "./receivables.js";
 export * from "./company.js";
+export * from "./sync.js";

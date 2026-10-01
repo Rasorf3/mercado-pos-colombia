@@ -3,14 +3,16 @@ import type { SalesService } from "./salesService";
 import type { ReceiptService } from "../receipts/receiptService";
 import { createSalesHandlers } from "./salesHandlers";
 import type { AuthService } from "../auth/authService";
+import type { SyncService } from "../sync/syncService";
 
 export function registerSalesIpc(
   service: SalesService,
   receipts: ReceiptService,
   getWindow: () => Electron.BrowserWindow | null,
-  auth: AuthService
+  auth: AuthService,
+  sync?: SyncService
 ): void {
-  for (const [channel, handler] of Object.entries(createSalesHandlers(service, receipts, getWindow, auth))) {
+  for (const [channel, handler] of Object.entries(createSalesHandlers(service, receipts, getWindow, auth, sync))) {
     ipcMain.removeHandler(channel);
     ipcMain.handle(channel, handler);
   }

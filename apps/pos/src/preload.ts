@@ -6,6 +6,7 @@ import { AUTH_CHANNELS, type AuthBridge } from "./authBridge";
 import { CASH_CHANNELS, type CashBridge } from "./cashBridge";
 import { RECEIVABLES_CHANNELS, type ReceivablesBridge } from "./receivablesBridge";
 import { COMPANY_CHANNELS, type CompanyBridge } from "./companyBridge";
+import { SYNC_CHANNELS, type SyncBridge } from "./syncBridge";
 
 const catalog: CatalogBridge = {
   searchProductsForSale: (query) => ipcRenderer.invoke(CATALOG_CHANNELS.searchProductsForSale, query),
@@ -62,4 +63,5 @@ const company: CompanyBridge = {
   save: (input) => ipcRenderer.invoke(COMPANY_CHANNELS.save, input)
 };
 
-contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, auth, catalog, sales, clients, cash, receivables, company });
+const sync:SyncBridge={status:()=>ipcRenderer.invoke(SYNC_CHANNELS.status),setup:(input)=>ipcRenderer.invoke(SYNC_CHANNELS.setup,input),run:()=>ipcRenderer.invoke(SYNC_CHANNELS.run),reconcileStock:(input)=>ipcRenderer.invoke(SYNC_CHANNELS.reconcileStock,input),reviewConflict:(input)=>ipcRenderer.invoke(SYNC_CHANNELS.reviewConflict,input)};
+contextBridge.exposeInMainWorld("electronAPI", { platform: process.platform, auth, catalog, sales, clients, cash, receivables, company, sync });

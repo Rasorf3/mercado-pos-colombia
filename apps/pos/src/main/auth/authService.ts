@@ -46,7 +46,7 @@ export class AuthService {
     validatePassword(input.password);
     const { salt, hash } = await hashPassword(input.password);
     const create = this.database.transaction(() => {
-      const count = this.database.prepare("SELECT count(*) AS count FROM pos_users").get() as { count: bigint };
+      const count = this.database.prepare("SELECT count(*) AS count FROM pos_users WHERE remote_actor=0").get() as { count: bigint };
       if (count.count !== 0n) throw new Error("La caja ya tiene usuarios configurados. Inicia sesión.");
       const now = new Date().toISOString();
       const id = randomUUID();
@@ -70,7 +70,7 @@ export class AuthService {
 
     const row = this.database.prepare(`
       SELECT id, username, password_salt, password_hash, role, active, created_at, last_login_at
-      FROM pos_users WHERE username = ? COLLATE NOCASE
+      FROM pos_users WHERE username = ? COLLATE NOCASE AND remote_actor=0
     `).get(username) as UserRow | undefined;
     const actualHash = await hashPassword(input.password, row?.password_salt ?? DUMMY_SALT);
     const expectedHash = row?.password_hash ? Buffer.from(row.password_hash, "hex") : Buffer.alloc(PASSWORD_BYTES);
@@ -101,7 +101,7 @@ export class AuthService {
     const userId = this.sessions.get(sessionKey);
     const user = userId ? this.getActiveUserById(userId) : null;
     if (userId && !user) this.sessions.delete(sessionKey);
-    const count = this.database.prepare("SELECT count(*) AS count FROM pos_users").get() as { count: bigint };
+    const count = this.database.prepare("SELECT count(*) AS count FROM pos_users WHERE remote_actor=0").get() as { count: bigint };
     return { needsBootstrap: count.count === 0n, user: user ? toUser(user) : null };
   }
 
@@ -124,7 +124,7 @@ export class AuthService {
   listUsers(): User[] {
     const rows = this.database.prepare(`
       SELECT id, username, role, active, created_at, last_login_at
-      FROM pos_users WHERE role != 'admin_master'
+      FROM pos_users WHERE role != 'admin_master' AND remote_actor=0
       ORDER BY active DESC, role, username COLLATE NOCASE
     `).all() as UserRow[];
     return rows.map(toUser);
@@ -156,6 +156,7 @@ export class AuthService {
   setUserActive(userId: string, active: boolean, actingUserId: string): User {
     if (userId === actingUserId && !active) throw new Error("No puedes desactivar tu propio usuario mientras tienes la sesión abierta.");
     const update = this.database.transaction(() => {
+      if(this.database.prepare("SELECT 1 FROM pos_users WHERE id=? AND remote_actor=1").get(userId)) throw new Error("Los actores de otras cajas no son cuentas locales administrables.");
       const target = this.getById(userId);
       if (!target || target.role === "admin_master") throw new Error("No se encontró el usuario administrable.");
       if (!active && target.active === 1n && target.role === "admin") {

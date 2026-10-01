@@ -4,12 +4,13 @@ Aplicación de punto de venta local para mercados en Colombia. Usa Node.js 24, n
 
 El acceso requiere usuario y contraseña. El primer inicio configura una única cuenta Admin; después Admin puede crear cuentas Admin, EmpleadoJefe o Empleado, pero no AdminMaster. Los permisos se comprueban también en el proceso principal, no solo en la interfaz.
 
-La caja registra ventas locales offline, pagadas o expresamente fiadas, con descuento de existencias y trazabilidad. Incluye catálogo, promociones, clientes, cartera con abonos, apertura/cierre de caja, historial e impresión/PDF de comprobantes de 58 y 80 mm. Las ventas quedan pendientes de integración con facturación electrónica: no se emiten ni se envían a la DIAN. La API actual solo ofrece `/health` y no participa en estas operaciones.
+La caja registra ventas locales offline, pagadas o expresamente fiadas, con descuento de existencias y trazabilidad. Incluye catálogo, promociones, clientes, cartera con abonos, apertura/cierre de caja, historial e impresión/PDF de comprobantes de 58 y 80 mm. Las ventas quedan pendientes de integración con facturación electrónica: no se emiten ni se envían a la DIAN. La sincronización entre cajas es optativa: sin configurar PostgreSQL la API solo ofrece `/health`; con configuración habilita `/sync/*`. Las cajas vinculadas pueden vender pagado desconectadas; fiados y abonos compartidos requieren autorización central.
 
 ## Requisitos
 
 - Node.js 24.x
 - npm 11 o superior
+- PostgreSQL solo para el servidor si se activa sincronización; no se requiere para caja local ni para ejecutar las pruebas aisladas.
 
 ## Instalación
 
@@ -67,6 +68,16 @@ Consulta [`docs/users-and-roles.md`](docs/users-and-roles.md) para la matriz de 
 
 En cualquier sección, usa **A−** y **A+** en la barra superior para ajustar el tamaño de letra entre 100 % y 150 %; **↺** lo restablece. La preferencia se guarda localmente en esta caja.
 
+## Varias cajas y servidor optativo
+
+Admin puede entrar en **Sincronización** para vincular cada instalación a un mismo comercio, consultar pendientes y revisar faltantes/conflictos. Cada computador mantiene su SQLite, cuentas y turno propios; no se copia ni comparte el archivo de base por red.
+
+En el servidor, completar **privadamente** `DATABASE_URL` y `SYNC_PAIRING_KEY` en `.env` raíz (ignorado por Git), usando los nombres de `.env.example`. `npm run dev:api` compila los paquetes compartidos, carga la configuración y aplica la migración PostgreSQL si está configurado. Para iniciar la API compilada después del build: `npm run start --workspace @mercado-pos/api`. No publica HTTPS automáticamente: para comunicar computadores se requiere una URL HTTPS confiable; HTTP se admite solo en loopback para pruebas.
+
+Vincula primero la instalación con datos y después cajas sin datos operativos. Se conserva respaldo SQLite verificado antes de la primera vinculación; no es una copia periódica. Cada venta/movimiento y su cola se guardan juntos; los reintentos no duplican ventas. Si varias cajas desconectadas exceden el stock global, se conservan sus operaciones y Admin concilia el faltante con conteo físico después de sincronizarlas. Los fiados/abonos usan reservas centrales estrictas y no se autorizan sin conexión.
+
+Consulta [preparación, recuperación, seguridad y límites](docs/multi-register-sync.md). Las pruebas automatizadas usan SQLite/PGlite aislados; aún falta comprobar PostgreSQL como servicio y varios computadores reales antes del despliegue diario.
+
 ## Estructura
 
 ```text
@@ -92,7 +103,7 @@ En cualquier sección, usa **A−** y **A+** en la barra superior para ajustar e
 - Solo se registra un método por venta pagada o por abono. No se procesan tarjetas ni se verifican transferencias; las referencias/códigos opcionales no prueban el pago.
 - El acceso a SQLite ocurre solo en el proceso principal de Electron. El renderer recibe operaciones limitadas mediante `preload`.
 - Las contraseñas se almacenan como hashes `scrypt` con sal individual; la sesión no persiste al reiniciar la aplicación. AdminMaster no tiene cuenta o secreto integrado y no se puede asignar desde la interfaz.
-- No se guardan certificados digitales, credenciales ni tokens. No se guardan números de tarjeta, CVV, PIN o claves bancarias. Los datos de clientes viven solo en la SQLite local de la caja, que no está cifrada; protege el perfil del sistema operativo y planifica respaldos.
+- No se guardan certificados DIAN ni secretos en Git. La credencial optativa del dispositivo se cifra con `safeStorage` fuera de SQLite; la API conserva su hash. No se guardan números de tarjeta, CVV, PIN o claves bancarias. Los clientes viven en SQLite y, si se vincula, se replican al servidor del comercio. SQLite no está cifrada; protege perfiles, servidor y respaldos. Las cuentas siguen locales: no hay autenticación central de empleados.
 - La documentación de DIAN describe decisiones pendientes y no habilita llamadas externas.
 
-Faltan sincronización/PostgreSQL, emisión DIAN, datos fiscales confirmados, proveedores, procesamiento bancario, respaldos integrados, movimientos manuales de caja, instalador firmado y validación con impresora física. Lee [arquitectura](docs/architecture.md), [venta offline](docs/offline-sale-flow.md), [diseño DIAN](docs/dian/electronic-invoicing-design.md), [datos pendientes del comercio](docs/dian/merchant-onboarding-checklist.md), [guía de continuidad](docs/AI_HANDOFF.md) y [`AGENTS.md`](AGENTS.md) antes de ampliar el proyecto.
+Faltan despliegue y validación multi-equipo/PostgreSQL real, administración central de usuarios/dispositivos y revocación, emisión DIAN, datos fiscales confirmados, proveedores, procesamiento bancario, respaldos periódicos/restauración asistida, movimientos manuales de caja, instalador firmado y validación con impresora física. Lee [arquitectura](docs/architecture.md), [venta offline](docs/offline-sale-flow.md), [sincronización](docs/multi-register-sync.md), [diseño DIAN](docs/dian/electronic-invoicing-design.md), [datos pendientes del comercio](docs/dian/merchant-onboarding-checklist.md), [guía de continuidad](docs/AI_HANDOFF.md) y [`AGENTS.md`](AGENTS.md) antes de ampliar el proyecto.

@@ -4,7 +4,7 @@ Guía breve para continuar el trabajo en este repositorio. Es un resumen operati
 
 ## Proyecto y estado actual
 
-Mercado POS Colombia es una caja de escritorio local-first. El monorepo usa Node.js 24, npm workspaces, Electron Forge + Webpack + TypeScript + React, Fastify y SQLite. La API solo tiene `/health`; PostgreSQL y la sincronización no están implementados. Electron está en la línea 44 (`^44.4.5`).
+Mercado POS Colombia es una caja de escritorio local-first. El monorepo usa Node.js 24, npm workspaces, Electron Forge + Webpack + TypeScript + React, Fastify y SQLite. La sincronización multi-caja es optativa, con PostgreSQL central: sin `DATABASE_URL` la API solo tiene `/health`, con configuración habilita `/sync/*`. Electron está en la línea 44 (`^44.4.5`). DIAN sigue sin implementarse.
 
 Ya existen:
 
@@ -21,6 +21,7 @@ Ya existen:
 - Perfil del comercio local (migración v9): **Mi empresa** permite a Admin registrar nombre, razón social, NIT/DV opcionales, dirección, municipio/departamento, teléfonos y correo; muestra empleados desde las cuentas existentes. `company:manage` se comprueba en main para lectura y escritura. No activa facturación DIAN, no aparece en comprobantes ni se comparte entre equipos.
 - Migraciones SQLite v4-v9: cuentas/roles y atribución del actor en operaciones nuevas de venta, inventario, productos y clientes; peso opcional por unidad/empaque (g/kg/lb); promociones e instantáneas de descuentos; turnos de caja; teléfono/dirección de cliente, cupo de fiado, tipo de liquidación, ledger de cargos/abonos y desglose de abonos en caja; perfil del comercio inicialmente vacío. Las ventas anteriores quedan sin `cash_session_id`, como pagadas y sin deuda retroactiva. Datos previos conservan atribución nula, contactos nuevos nulos, productos sin peso ni promoción y ventas sin descuento.
 - Pruebas de dominio, contratos, persistencia SQLite, migraciones y reversión completa de una venta ante error.
+- Sincronización optativa (SQLite v10/PostgreSQL v1): cola durable en la misma transacción de catálogo/clientes/venta/turno/cartera; eventos idempotentes, aislamiento por comercio, descarga y actores de auditoría sin cuentas remotas. Ventas pagadas continúan offline con stock local; faltantes globales se concilian por Admin sin borrar ventas/pagos. Fiados/abonos compartidos requieren reserva central y conexión. La clave de vinculación no se conserva; el token de dispositivo se cifra con `safeStorage` fuera de SQLite. Hay respaldo verificado antes de migrar v9 y antes de vincular, no respaldo periódico. Leer [`multi-register-sync.md`](multi-register-sync.md) para activación, recuperación, confianza en dispositivos y límites pendientes.
 
 La verificación del 2026-09-28 pasó `npm test` (27 pruebas), `npm run typecheck`, `npm run build`, `git diff --check` y el inicio de `npm run dev:pos` con una ventana visible. Se generaron y revisaron visualmente PDFs reales de 58/80 mm, incluidos 40 productos con nombres largos; también se probó navegación y PDF desde cierre/detalle con perfil aislado y red bloqueada. No se probó una impresora física ni la interacción manual con los diálogos del controlador: cancelaciones y selección de ruta se simularon. Solo se detectaron impresoras virtuales. La compilación y las pruebas pueden mostrar avisos no bloqueantes `MODULE_TYPELESS_PACKAGE_JSON` relacionados con la detección de módulos. Repite las verificaciones después de modificar el código; el árbol de trabajo puede haber cambiado desde esa ejecución.
 
@@ -38,6 +39,10 @@ Implementación de clientes y cartera local (2026-09-29): migración SQLite v8 a
 
 ## Mapa del código
 
+Verificación de sincronización, 2026-10-01: `npm test` pasó **60 pruebas** (6 API, 30 POS, 9 contratos, 15 dominio), también `npm run typecheck`, `npm run build` y `git diff --check`. `npm run dev:api` respondió por HTTP en loopback con `status: ok`; `npm run dev:pos` abrió una ventana “Mercado POS Colombia” respondiendo, con `APPDATA` temporal aislado, luego se cerró. Las pruebas multi-caja usan SQLite/PGlite y transporte simulado; no hubo despliegue PostgreSQL como servicio, varios computadores físicos, recorrido visual de la nueva pantalla ni impresión física. No se tocaron bases de usuario, no se habilitó DIAN y no se hizo commit/push. Persisten avisos `MODULE_TYPELESS_PACKAGE_JSON` no bloqueantes.
+
+Se añadieron versiones exactas `pg@8.23.1`, `@types/pg@8.23.1` y PGlite de pruebas `0.5.8`; Electron permanece `44.4.5`. Audit completo: **28 paquetes afectados** (1 crítico, 22 altos, 2 moderados, 3 bajos) en herramientas Forge y dependencias de desarrollo; `npm audit --omit=dev --json`: 0. No se aplicaron correcciones/overrides de seguridad ni actualizaciones mayores. Ver detalle y límites en [`multi-register-sync.md`](multi-register-sync.md); preparar mantenimiento Forge 8 separado antes de distribución final.
+
 - `apps/pos/src/renderer/`: React; no accede directamente a Node, Electron ni SQLite.
 - `apps/pos/src/preload.ts`: API acotada expuesta al renderer.
 - `apps/pos/src/main.ts` y `apps/pos/src/main/`: ciclo de vida Electron, IPC, servicios y SQLite.
@@ -47,7 +52,8 @@ Implementación de clientes y cartera local (2026-09-29): migración SQLite v8 a
 - `apps/pos/src/main/database/`: apertura de SQLite y migraciones versionadas.
 - `apps/pos/src/main/sales/`: lecturas de historial/detalle, cierre de ventas y validación de solicitudes IPC. `main/receipts/`: plantilla escapada, servicio de solo lectura y adaptador Electron de impresión/PDF.
 - `apps/pos/src/renderer/SalesHistoryScreen.tsx`, `SaleDetail.tsx`, `ReceiptActions.tsx`: historial, detalle y controles de salida. `packages/contracts/src/salesHistory.ts`: contratos de consulta y comprobante.
-- `apps/api/`: Fastify independiente, actualmente con `/health`.
+- `apps/api/`: Fastify independiente, `/health` y `src/sync/` optativo con `pg`, migración PostgreSQL, tokens de dispositivo, eventos y reservas de cartera. `test/sync.test.mjs` ejercita dos instalaciones reales de servicios SQLite contra Fastify/PGlite aislados.
+- `apps/pos/src/main/sync/`: journal/outbox transaccional, importación deduplicada, servicio de transporte, IPC y custodia de token. `renderer/SyncScreen.tsx` y `SyncStatusBar.tsx`: configuración Admin, pendientes e incidencias. `main/database/migrations/010_sync.ts` y `migrationBackup.ts`: identidad/origen, migración y snapshots verificados.
 - `packages/domain/`: reglas puras de catálogo, cantidades, promociones/descuentos, pagos y totales.
 - `packages/contracts/`: esquemas TypeBox compartidos.
 - `docs/architecture.md`, `docs/offline-sale-flow.md`, `docs/dian.md`: arquitectura, venta offline y límites DIAN.
@@ -75,6 +81,9 @@ Implementación de clientes y cartera local (2026-09-29): migración SQLite v8 a
 - El perfil del comercio es local y solo Admin/AdminMaster pueden acceder; NIT y DV se guardan como texto sin verificación oficial. No incluirlo automáticamente en comprobantes o documentos electrónicos antes de definir datos fiscales y preservar instantáneas históricas.
 - Contraseñas: sal aleatoria y hash scrypt, mínimo 5 caracteres; la interfaz avisa si Bloq Mayús está activo. No registrar contraseñas ni hashes en renderer o logs. La SQLite no está cifrada; la cuenta del sistema operativo sigue siendo parte de la frontera de seguridad.
 - No añadir secretos, certificados reales, bases SQLite de usuario ni datos reales al repositorio. No hacer llamadas productivas a DIAN.
+- No sobreescribir stock desde una fila remota: sumar movimientos. No se permite vender por encima de disponibilidad local; el saldo global firmado puede ser negativo tras ventas offline simultáneas, generando faltante visible. Admin concilia después de enviar todas las cajas, con conteo y movimiento; conservar ventas y estados fiscales.
+- La cartera vinculada exige autorización central: no nuevos fiados/abonos compartidos offline. Reservas de operaciones confirmadas no expiran automáticamente; conservar intentos y recuperar cancelaciones abandonadas. Turnos siempre por `origin_device_id`, nunca usar el de otra caja.
+- No clonar SQLite/perfil/identidad ni vincular bases históricas independientes como cajas nuevas. No transferir credenciales/roles de login: actores remotos están desactivados, no son empleados de Mi empresa. La API confía en el dispositivo para atribuir al actor; usuarios/revocación centrales siguen pendientes.
 
 ## Comandos desde la raíz
 
@@ -92,6 +101,6 @@ npm run verify
 
 ## Trabajo pendiente y límites de alcance
 
-No están implementados: emisión electrónica o integración DIAN, sincronización/idempotencia con PostgreSQL, autenticación y aislamiento multi-comercio en la API, proveedores, movimientos manuales de ingreso/retiro de efectivo, varios cajones por instalación, suscripciones ni procesamiento/conciliación de pagos. La administración local de usuarios no autentica la API. Faltan recuperación/cambio de contraseñas, bloqueo por inactividad y aprovisionamiento seguro de AdminMaster. La impresión local/PDF sí existe; calibración física, corte de papel y cajón quedan pendientes. Antes de trabajar requisitos tributarios, consulta fuentes oficiales vigentes y registra fuente, versión y fecha en `docs/dian/`. La integración DIAN sigue pendiente de configuración fiscal confirmada. Mantén cualquier integración externa aislada y empieza en ambiente de pruebas.
+No están implementados: emisión electrónica/DIAN, proveedores, movimientos manuales de ingreso/retiro, varios cajones por instalación, suscripciones ni procesamiento/conciliación bancaria. Sincronización/autenticación de dispositivos/aislamiento central están implementados como opción, pero faltan despliegue con PostgreSQL real y HTTPS, pruebas físicas multi-equipo, administración/revocación central y recuperación ante pérdida definitiva de una caja. PGlite de pruebas no es el servidor de producción. La administración local de usuarios no es una sesión central API. Faltan recuperación/cambio de contraseñas, bloqueo por inactividad, respaldo periódico/restauración asistida y aprovisionamiento seguro de AdminMaster. La impresión local/PDF sí existe; calibración física, corte de papel y cajón quedan pendientes. Antes de trabajar requisitos tributarios, consulta fuentes oficiales vigentes y registra fuente, versión y fecha en `docs/dian/`. La integración DIAN sigue pendiente de configuración fiscal confirmada.
 
 Antes de editar, revisa `git status` y los cambios locales para preservar trabajo previo; no presupongas que el checkout está limpio. No hagas commit, push, cambios de dependencias de seguridad ni amplíes el alcance sin autorización explícita.

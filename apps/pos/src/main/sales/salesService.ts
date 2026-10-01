@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
+import { trackedTransaction } from "../sync/syncJournal.ts";
 import { SaleIdSchema, type SalesListInput, type SalesPage } from "@mercado-pos/contracts";
 import { salesDateBounds, validateSalesRequest } from "./salesRequests.ts";
 import {
@@ -133,10 +134,10 @@ export class SalesService {
       requestedDiscounts.set(line.productId, selection);
     }
     const requestedLines = combineSaleQuantities(input.items);
-    const create = this.database.transaction(() => {
+    const create = trackedTransaction(this.database, "sale", actorUserId, () => {
       const createdAt = new Date().toISOString();
       const today = formatBogotaDate(new Date(createdAt));
-      const cashSession = this.database.prepare("SELECT id FROM cash_sessions WHERE status = 'open'")
+      const cashSession = this.database.prepare("SELECT id FROM cash_sessions WHERE status = 'open' AND origin_device_id=(SELECT device_id FROM sync_settings WHERE id=1)")
         .get() as { id: string } | undefined;
       if (!cashSession) {
         throw new Error("No hay una caja abierta. Pide a un usuario Admin o EmpleadoJefe que inicie el turno.");
@@ -305,6 +306,20 @@ export class SalesService {
       .get(id) as { created_by_user_id: string | null } | undefined;
     if (!row) throw new SaleNotFoundError();
     return row.created_by_user_id;
+  }
+
+  quoteCredit(input: SaleCreateInput): string {
+    if (!input.clientId) throw new Error("Para fiar una venta debes seleccionar un cliente.");
+    this.getActiveBuyer(input.clientId);
+    const today = formatBogotaDate();
+    return calculateSaleAmounts(combineSaleQuantities(input.items).map((line) => {
+      const p = this.database.prepare("SELECT * FROM products WHERE id=? AND active=1").get(line.productId) as ProductForSaleRow | undefined;
+      if (!p) throw new Error("Uno de los productos ya no está disponible.");
+      const requested = input.items.find((i) => i.productId === line.productId)!;
+      const promotion = p.promotion_discount_type === null ? null : { discount: normalizeDiscount(discountFromStored(p.promotion_discount_type,p.promotion_discount_value),p.sale_price_cop)!, startsOn:p.promotion_starts_on!,endsOn:p.promotion_ends_on! };
+      const discount = Object.prototype.hasOwnProperty.call(requested,"discount") ? requested.discount ?? null : formatDiscountDraft(activePromotionDiscount(promotion,today));
+      return { quantity:formatQuantityMilli(line.quantityMilli), unitPriceCop:p.sale_price_cop.toString(),discount };
+    })).totalCop.toString();
   }
 
   listRecentSales(): SaleSummary[] {

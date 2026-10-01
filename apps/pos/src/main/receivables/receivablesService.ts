@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
+import { trackedTransaction } from "../sync/syncJournal.ts";
 import type {
   ClientCreditAccount,
   ClientCreditAccountSummary,
@@ -95,11 +96,11 @@ export class ReceivablesService {
   }
 
   recordPayment(input: CreditPaymentInput, actorUserId: string | null = null): ClientCreditAccount {
-    const record = this.database.transaction(() => {
+    const record = trackedTransaction(this.database, "credit_payment", actorUserId, () => {
       const row = this.getAccountRow(input.clientId);
       if (!row) throw new Error("No se encontró la cuenta del cliente.");
       const payment = normalizeCreditPayment(input, row.balance_cop);
-      const cashSession = this.database.prepare("SELECT id FROM cash_sessions WHERE status = 'open'")
+      const cashSession = this.database.prepare("SELECT id FROM cash_sessions WHERE status = 'open' AND origin_device_id=(SELECT device_id FROM sync_settings WHERE id=1)")
         .get() as { id: string } | undefined;
       if (payment.method === "cash" && !cashSession) {
         throw new Error("Abre un turno de caja antes de registrar un abono en efectivo.");

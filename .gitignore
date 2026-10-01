@@ -32,6 +32,10 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
 
 # Sistema operativo y editores
 .DS_Store

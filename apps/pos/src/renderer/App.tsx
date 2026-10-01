@@ -28,12 +28,14 @@ import { LoginScreen } from "./LoginScreen";
 import { CashScreen } from "./CashScreen";
 import { ReceivablesScreen } from "./ReceivablesScreen";
 import { CompanyScreen } from "./CompanyScreen";
+import { SyncScreen } from "./SyncScreen";
+import { SyncStatusBar } from "./SyncStatusBar";
 import { userFacingError } from "./userFacingError";
 import "./salesHistory.css";
 
 const FONT_SIZE_STEPS = [100, 110, 120, 130, 140, 150] as const;
 const FONT_SIZE_STORAGE_KEY = "mercado-pos-font-size";
-type Page = "catalog" | "sales" | "clients" | "history" | "users" | "cash" | "receivables" | "company";
+type Page = "catalog" | "sales" | "clients" | "history" | "users" | "cash" | "receivables" | "company" | "sync";
 
 export function App(): ReactElement {
   const [authState, setAuthState] = useState<AuthState | null>(null);
@@ -274,7 +276,8 @@ export function App(): ReactElement {
         <div className="local-status"><span className="status-light" /> {authState.user.username} · {roleLabel(authState.user.role)} <button className="logout-button" type="button" onClick={() => void logout()}>Salir</button> <span className="status-divider">·</span> {platform}</div>
       </header>
 
-      {activePage === "company" ? <CompanyScreen onManageUsers={() => setActivePage("users")} /> : activePage === "cash" ? <CashScreen /> : activePage === "receivables" ? <ReceivablesScreen /> : activePage === "users" ? <UsersScreen /> : activePage === "history" ? <SalesHistoryScreen /> : activePage === "clients" ? <ClientsScreen /> : activePage === "sales" ? <SalesScreen showSalesHistory={roleCan(authState.user.role, "sales:history")} onBackToCatalog={() => setActivePage(roleCan(authState.user!.role, "catalog:read") ? "catalog" : "sales")} /> : <>
+      <SyncStatusBar onOpen={roleCan(authState.user.role,"sync:manage")?()=>setActivePage("sync"):undefined}/>
+      {activePage === "sync" ? <SyncScreen onOpenCatalog={()=>setActivePage("catalog")} onOpenClients={()=>setActivePage("clients")}/> : activePage === "company" ? <CompanyScreen onManageUsers={() => setActivePage("users")} /> : activePage === "cash" ? <CashScreen /> : activePage === "receivables" ? <ReceivablesScreen /> : activePage === "users" ? <UsersScreen /> : activePage === "history" ? <SalesHistoryScreen /> : activePage === "clients" ? <ClientsScreen /> : activePage === "sales" ? <SalesScreen showSalesHistory={roleCan(authState.user.role, "sales:history")} onBackToCatalog={() => setActivePage(roleCan(authState.user!.role, "catalog:read") ? "catalog" : "sales")} /> : <>
       <section className="page-heading">
         <div><p className="eyebrow">Administración de productos</p><h1>Catálogo e inventario</h1><p className="subheading">Tus productos y existencias, disponibles incluso sin internet.</p></div>
         <button className="primary-button" onClick={() => { setMessage(""); setEditing(null); }}><span aria-hidden="true">＋</span> Nuevo producto</button>
@@ -337,7 +340,8 @@ function pagesForRole(role: UserRole): { id: Page; label: string }[] {
     { id: "cash", label: "Caja", capability: "cash:close" },
     { id: "receivables", label: "Fiados", capability: "credit:read" },
     { id: "users", label: "Usuarios", capability: "users:manage" },
-    { id: "company", label: "Mi empresa", capability: "company:manage" }
+    { id: "company", label: "Mi empresa", capability: "company:manage" },
+    { id: "sync", label: "Sincronización", capability: "sync:manage" }
   ];
   return pages.filter((page) => roleCan(role, page.capability)).map(({ id, label }) => ({ id, label }));
 }

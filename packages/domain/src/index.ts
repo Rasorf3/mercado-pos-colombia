@@ -4,3 +4,4 @@ export * from "./sales.js";
 export * from "./discounts.js";
 export * from "./access.js";
 export * from "./company.js";
+export * from "./sync.js";

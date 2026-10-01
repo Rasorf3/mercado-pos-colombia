@@ -6,6 +6,7 @@ import type { AuthBridge } from "../authBridge";
 import type { CashBridge } from "../cashBridge";
 import type { ReceivablesBridge } from "../receivablesBridge";
 import type { CompanyBridge } from "../companyBridge";
+import type { SyncBridge } from "../syncBridge";
 
 declare global {
   interface Window {
@@ -18,6 +19,7 @@ declare global {
       cash: CashBridge;
       receivables: ReceivablesBridge;
       company: CompanyBridge;
+      sync: SyncBridge;
     };
   }
 }

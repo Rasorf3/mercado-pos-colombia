@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
+import { trackedTransaction } from "../sync/syncJournal.ts";
 import { normalizeClientDraft, parseCopInteger } from "@mercado-pos/domain";
 import type { Client, ClientCreateInput, ClientSearchInput, ClientUpdateInput, SaleClientMatch } from "@mercado-pos/contracts";
 
@@ -93,7 +94,7 @@ export class ClientsService {
     const id = randomUUID();
     const now = new Date().toISOString();
     try {
-      const create = this.database.transaction(() => {
+      const create = trackedTransaction(this.database, "client", actorUserId, () => {
         this.database.prepare(`
           INSERT INTO clients (
             id, name, document_type, document_number, email, phone, address, credit_limit_cop,
@@ -113,7 +114,7 @@ export class ClientsService {
 
   update(id: string, input: ClientUpdateInput, actorUserId: string | null = null): Client {
     try {
-      const update = this.database.transaction(() => {
+      const update = trackedTransaction(this.database, "client", actorUserId, () => {
         const current = this.getRow(id);
         if (!current) throw new ClientNotFoundError();
         const draft = normalizeClientDraft({
@@ -148,7 +149,7 @@ export class ClientsService {
   setCreditLimit(id: string, value: string, actorUserId: string | null = null): Client {
     const creditLimitCop = parseCopInteger(value);
     try {
-      const update = this.database.transaction(() => {
+      const update = trackedTransaction(this.database, "credit_limit", actorUserId, () => {
         const current = this.getRow(id);
         if (!current) throw new ClientNotFoundError();
         if (creditLimitCop < current.credit_balance_cop) {

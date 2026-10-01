@@ -15,6 +15,7 @@ import { CLIENTS_CHANNELS } from "../../clientsBridge";
 import { ClientsService } from "./clientsService";
 import { AuthService } from "../auth/authService";
 import { trustedSessionUser } from "../auth/authIpc";
+import type { SyncService } from "../sync/syncService";
 
 function validateInput<T>(schema: object, input: unknown): asserts input is T {
   if (!Value.Check(schema as TSchema, input)) {
@@ -31,7 +32,8 @@ function assertTrustedMainFrame(event: IpcMainInvokeEvent, window: Electron.Brow
 export function registerClientsIpc(
   service: ClientsService,
   getWindow: () => Electron.BrowserWindow | null,
-  auth: AuthService
+  auth: AuthService,
+  sync?: SyncService
 ): void {
   const handle = (channel: string, callback: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown) => {
     ipcMain.removeHandler(channel);
@@ -69,6 +71,6 @@ export function registerClientsIpc(
     const user = trustedSessionUser(auth, _event, getWindow(), "clients:credit-manage");
     validateInput<string>(ClientIdSchema, id);
     validateInput<ClientCreditLimitUpdate>(ClientCreditLimitUpdateSchema, input);
-    return service.setCreditLimit(id, input.creditLimitCop, user.id);
+    return sync ? sync.requireOnline(()=>service.setCreditLimit(id,input.creditLimitCop,user.id)) : service.setCreditLimit(id, input.creditLimitCop, user.id);
   });
 }

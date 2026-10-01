@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
+import { trackedTransaction } from "../sync/syncJournal.ts";
 import {
   applyStockDelta,
   discountFromStored,
@@ -125,7 +126,7 @@ export class CatalogService {
     const id = randomUUID();
     const now = new Date().toISOString();
 
-    const create = this.database.transaction(() => {
+    const create = trackedTransaction(this.database, "product", actorUserId, () => {
       this.database.prepare(`
         INSERT INTO products (
           id, name, internal_code, barcode, cost_cop, sale_price_cop,
@@ -173,7 +174,7 @@ export class CatalogService {
   }
 
   updateProduct(id: string, input: ProductUpdateInput, actorUserId: string | null = null): Product {
-    const updated = this.database.transaction(() => {
+    const updated = trackedTransaction(this.database, "product", actorUserId, () => {
       const existing = this.getProduct(id);
       const draft = normalizeProductDraft({
         ...input,
@@ -260,7 +261,7 @@ export class CatalogService {
     actorUserId: string | null
   ): InventoryMovement {
     const reason = validateMovementNote(note);
-    const record = this.database.transaction(() => {
+    const record = trackedTransaction(this.database, "inventory", actorUserId, () => {
       const product = this.database
         .prepare("SELECT stock_milli FROM products WHERE id = ?")
         .get(productId) as { stock_milli: bigint } | undefined;
